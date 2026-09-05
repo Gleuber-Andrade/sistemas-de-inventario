@@ -163,6 +163,19 @@ table.users tr:last-child td{border-bottom:none;}
 .perm-editor.show{display:flex;}
 .perm-editor label{display:flex; align-items:center; gap:6px; font-size:0.8rem; white-space:nowrap;}
 
+/* Importação em massa via CSV */
+.import-csv-box{border:1.5px dashed var(--line); border-radius:14px; padding:16px 20px; margin-bottom:24px; background:#FCFBF8;}
+.import-csv-box .linha-topo{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+.import-csv-box h4{margin:0; font-size:0.95rem;}
+.import-csv-box p{margin:4px 0 0; font-size:0.82rem; color:var(--ink-soft); font-family:"Inter",sans-serif;}
+.import-csv-actions{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px;}
+.import-csv-actions input[type=file]{font-size:0.85rem; font-family:"Inter",sans-serif;}
+.import-resultado{margin-top:14px; font-size:0.85rem; font-family:"Inter",sans-serif; border-radius:10px; padding:12px 14px; display:none;}
+.import-resultado.show{display:block;}
+.import-resultado.ok{background:#E8F6F4; color:var(--teal-dark);}
+.import-resultado.parcial{background:#FDF0DA; color:#8A5A00;}
+.import-resultado ul{margin:8px 0 0; padding-left:18px;}
+
 /* ---------- Visualizador de sistema (iframe em tela cheia) ---------- */
 #screenApp{flex-direction:column; height:100vh; overflow:hidden;}
 .app-bar{
@@ -264,6 +277,22 @@ table.users tr:last-child td{border-bottom:none;}
     <div class="admin-panel" id="adminPanel" style="display:none;">
       <h3>👤 Gerenciar usuários</h3>
       <p class="sub">Só administradores veem esta área. Crie contas para a equipe usar o painel e escolha a quais sistemas cada uma tem acesso.</p>
+
+      <div class="import-csv-box">
+        <div class="linha-topo">
+          <div>
+            <h4>📄 Importar usuários em massa (CSV)</h4>
+            <p>Cadastre vários usuários de uma vez enviando uma planilha CSV.</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="baixarModeloCSV()">⬇️ Baixar modelo CSV</button>
+        </div>
+        <div class="import-csv-actions">
+          <input type="file" id="arquivoCsvUsuarios" accept=".csv">
+          <button class="btn btn-primary btn-sm" onclick="importarUsuariosCSV()">📥 Importar arquivo</button>
+        </div>
+        <div class="import-resultado" id="importResultado"></div>
+      </div>
+
       <div class="new-user-form">
         <div class="new-user-grid">
           <div class="field"><label>Nome</label><input type="text" id="novoNome" placeholder="Nome completo"></div>
@@ -611,6 +640,117 @@ async function criarUsuario(){
   desenharChecksPermissaoNovoUsuario();
   await desenharUsuarios();
 }
+
+/* ---------------- Importação de usuários em massa (CSV) ---------------- */
+
+// Gera um arquivo de exemplo já com o formato certo (separador ";", uma
+// linha de cabeçalho, e a lista de chaves de sistema que existem agora —
+// se um sistema novo for cadastrado depois, o modelo baixado já vem com ele).
+function baixarModeloCSV(){
+  const chavesExemplo = Object.keys(SISTEMAS).join(',');
+  const linhas = [
+    'nome;login;senha;perfil;sistemas',
+    'Fulano da Silva;fulano.silva;senha1234;usuario;' + chavesExemplo,
+    'Ciclana Souza;ciclana.souza;outrasenha;admin;'
+  ];
+  const csv = '\uFEFF' + linhas.join('\n') + '\n';
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'modelo_usuarios.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Aceita tanto a chave (ex: "guarda") quanto o título completo do sistema
+// (ex: "Guarda de Lentes") na coluna "sistemas" — evita erro por causa de
+// maiúscula/minúscula ou acento.
+function normalizarChaveSistema(valor){
+  const v = normalizar(valor);
+  const porChave = Object.keys(SISTEMAS).find(k => normalizar(k) === v);
+  if(porChave) return porChave;
+  const porTitulo = Object.keys(SISTEMAS).find(k => normalizar(SISTEMAS[k].titulo) === v);
+  return porTitulo || null;
+}
+
+async function importarUsuariosCSV(){
+  const input = document.getElementById('arquivoCsvUsuarios');
+  const resultadoEl = document.getElementById('importResultado');
+  resultadoEl.className = 'import-resultado';
+  resultadoEl.innerHTML = '';
+
+  if(!input.files || input.files.length === 0){
+    resultadoEl.classList.add('show', 'parcial');
+    resultadoEl.textContent = 'Escolha um arquivo CSV primeiro.';
+    return;
+  }
+
+  const texto = await input.files[0].text();
+  const linhas = texto.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
+  if(linhas.length <= 1){
+    resultadoEl.classList.add('show', 'parcial');
+    resultadoEl.textContent = 'O arquivo está vazio ou só tem a linha de cabeçalho.';
+    return;
+  }
+
+  const usuariosExistentes = await dbGetAll('usuarios');
+  const loginsExistentes = new Set(usuariosExistentes.map(u => normalizar(u.login)));
+
+  let criados = 0;
+  const erros = [];
+
+  for(let i = 1; i < linhas.length; i++){ // linha 0 é o cabeçalho, sempre pulada
+    const numLinha = i + 1; // número que aparece se abrir o arquivo num editor/planilha
+    const colunas = linhas[i].split(';').map(c => c.trim());
+    const [nome, login, senha, perfilBruto, sistemasBruto] = colunas;
+
+    if(!nome || !login || !senha){
+      erros.push('Linha ' + numLinha + ': faltam nome, login ou senha.');
+      continue;
+    }
+    if(senha.length < 4){
+      erros.push('Linha ' + numLinha + ' (' + login + '): senha muito curta (mínimo 4 caracteres).');
+      continue;
+    }
+    const loginNormalizado = normalizar(login);
+    if(loginsExistentes.has(loginNormalizado)){
+      erros.push('Linha ' + numLinha + ' (' + login + '): já existe um usuário com esse login.');
+      continue;
+    }
+
+    const perfil = (perfilBruto && normalizar(perfilBruto) === 'admin') ? 'admin' : 'usuario';
+
+    let sistemasPermitidos;
+    if(perfil === 'admin'){
+      sistemasPermitidos = Object.keys(SISTEMAS);
+    } else if(!sistemasBruto){
+      sistemasPermitidos = Object.keys(SISTEMAS); // coluna em branco = libera tudo
+    } else {
+      sistemasPermitidos = sistemasBruto.split(',').map(s => s.trim()).filter(Boolean)
+        .map(normalizarChaveSistema).filter(Boolean);
+    }
+
+    const senhaHash = await sha256(senha);
+    await dbPut('usuarios', {
+      nome, login, senhaHash, perfil, ativo:true, sistemasPermitidos,
+      criadoEm: new Date().toISOString()
+    });
+    loginsExistentes.add(loginNormalizado); // evita duplicado dentro do próprio arquivo
+    criados++;
+  }
+
+  resultadoEl.classList.add('show', erros.length > 0 ? 'parcial' : 'ok');
+  let htmlResultado = '<b>' + criados + ' usuário(s) criado(s) com sucesso.</b>';
+  if(erros.length > 0){
+    htmlResultado += '<br>' + erros.length + ' linha(s) não importada(s):<ul>' + erros.map(e => '<li>'+e+'</li>').join('') + '</ul>';
+  }
+  resultadoEl.innerHTML = htmlResultado;
+
+  input.value = '';
+  await desenharUsuarios();
+}
+
 async function alternarUsuario(id){
   const u = await dbGet('usuarios', id);
   if(!u) return;
