@@ -516,7 +516,7 @@ const SISTEMAS = {
     b64key: 'CONTAGEM_B64'
   }
 };
-const conteudoDecodificado = {}; // cache para não decodificar toda vez
+const B64_POR_CHAVE = { guarda: GUARDA_B64, contagem: CONTAGEM_B64 }; const conteudoDecodificado = {}; // cache para não decodificar toda vez
 
 function decodificarBase64Utf8(b64){
   const bin = atob(b64);
@@ -529,7 +529,7 @@ function abrirSistema(chave){
   const info = SISTEMAS[chave];
   if(!info) return;
   if(!conteudoDecodificado[chave]){
-    conteudoDecodificado[chave] = decodificarBase64Utf8(window[info.b64key]);
+    conteudoDecodificado[chave] = decodificarBase64Utf8(B64_POR_CHAVE[chave]);
   }
   document.getElementById('appTitle').textContent = info.titulo;
   document.getElementById('appSwatch').style.background = info.cor;
