@@ -1,0 +1,2608 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sistema de Contagem de Estoque — WMS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root{
+  --blue:#0B5394;
+  --blue-dark:#073763;
+  --blue-light:#3D85C6;
+  --green:#1E8E3E;
+  --red:#C0392B;
+  --amber:#B7860B;
+  --gray:#F2F4F7;
+  --border:#D3D9E0;
+  --text:#1F2937;
+}
+*{box-sizing:border-box;}
+body{font-family:"Segoe UI", Arial, sans-serif; background:#e9edf1; margin:0; padding:0; color:var(--text);}
+header{background:var(--blue); color:#fff; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; position:sticky; top:0; z-index:50;}
+header .brand{display:flex; align-items:center; gap:10px;}
+header h1{font-size:1.1rem; margin:0; font-weight:700;}
+header .user-info{font-size:0.85rem; text-align:right;}
+header .user-info b{display:block; font-size:0.95rem;}
+nav{background:var(--blue-dark); display:flex; gap:4px; padding:0 16px; flex-wrap:wrap;}
+nav button{background:transparent; color:#cfe0f2; border:none; padding:12px 18px; cursor:pointer; font-size:0.92rem; font-weight:600; border-bottom:3px solid transparent;}
+nav button.active{color:#fff; border-bottom:3px solid #fff;}
+nav button:hover{color:#fff;}
+main{max-width:1200px; margin:20px auto; padding:0 16px 60px;}
+.card{background:#fff; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.08); padding:20px 24px; margin-bottom:18px;}
+.card h2{margin-top:0; color:var(--blue); font-size:1.05rem; border-bottom:2px solid var(--blue); padding-bottom:8px;}
+.card h3{color:var(--blue-dark); font-size:0.95rem; margin:16px 0 8px;}
+.btn{display:inline-block; background:var(--blue); color:#fff; border:none; padding:10px 18px; border-radius:6px; cursor:pointer; font-size:0.92rem; font-weight:600; transition:background .15s;}
+.btn:hover{background:var(--blue-dark);}
+.btn.secondary{background:#fff; color:var(--blue); border:1.5px solid var(--blue);}
+.btn.secondary:hover{background:#f0f4f8;}
+.btn.danger{background:#fff; color:var(--red); border:1.5px solid var(--red);}
+.btn.danger:hover{background:#fff0f0;}
+.btn.success{background:var(--green); color:#fff; border:none;}
+.btn.success:hover{background:#166a2f;}
+.btn.scan{background:#28a745; color:#fff; border:none;}
+.btn.scan:hover{background:#218838;}
+.btn:disabled{opacity:0.5; cursor:not-allowed;}
+.btn.small{padding:5px 10px; font-size:0.8rem;}
+input[type=text], input[type=password], input[type=number], input[type=date], select{
+  padding:9px 12px; border:1.5px solid var(--border); border-radius:6px; font-size:0.95rem; width:100%;
+}
+input:focus, select:focus{outline:2px solid var(--blue-light); border-color:var(--blue);}
+label{font-size:0.82rem; font-weight:600; color:#444; display:block; margin-bottom:4px;}
+.field{margin-bottom:12px;}
+.row{display:flex; gap:14px; flex-wrap:wrap;}
+.row > .field{flex:1; min-width:160px;}
+table{width:100%; border-collapse:collapse; font-size:0.88rem;}
+table th{background:var(--gray); text-align:left; padding:8px 10px; border-bottom:2px solid var(--border); white-space:nowrap; position:sticky; top:0; z-index:2; box-shadow:0 1px 0 var(--border);}
+table td{padding:7px 10px; border-bottom:1px solid var(--border);}
+table tr:hover td{background:#f7faff;}
+.badge{display:inline-block; padding:3px 10px; border-radius:12px; font-size:0.75rem; font-weight:700;}
+.badge.ok{background:#e2f6e8; color:var(--green);}
+.badge.pending{background:#fdf2e0; color:var(--amber);}
+.badge.error{background:#fdeaea; color:var(--red);}
+.badge.info{background:#e6eefb; color:var(--blue);}
+.badge.admin{background:#f0e6fb; color:#6a1fb0;}
+.hidden{display:none !important;}
+.toast-wrap{position:fixed; top:14px; right:14px; z-index:999; display:flex; flex-direction:column; gap:8px;}
+.toast{padding:12px 18px; border-radius:8px; color:#fff; font-size:0.9rem; font-weight:600; box-shadow:0 3px 12px rgba(0,0,0,0.25); max-width:340px; animation:slidein .2s ease;}
+.toast.ok{background:var(--green);}
+.toast.error{background:var(--red);}
+.toast.info{background:var(--blue);}
+.toast.warn{background:var(--amber);}
+@keyframes slidein{from{transform:translateX(30px); opacity:0;} to{transform:translateX(0); opacity:1;}}
+.modal-bg{position:fixed; inset:0; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; z-index:200; padding:16px;}
+.modal{background:#fff; border-radius:10px; padding:20px; max-width:480px; width:100%; max-height:88vh; overflow:auto;}
+.modal h3{margin-top:0; color:var(--blue);}
+#qr-reader-container{width:100%; margin:10px 0;}
+.center{text-align:center;}
+.muted{color:#777; font-size:0.85rem;}
+.step-indicator{display:flex; gap:8px; margin-bottom:18px;}
+.step-indicator .step{flex:1; text-align:center; padding:8px; border-radius:6px; background:var(--gray); font-size:0.82rem; font-weight:700; color:#888;}
+.step-indicator .step.active{background:var(--blue); color:#fff;}
+.step-indicator .step.done{background:var(--green); color:#fff;}
+.summary-box{display:flex; gap:16px; flex-wrap:wrap; margin-bottom:14px;}
+.summary-box .item{background:var(--gray); border-radius:8px; padding:12px 18px; flex:1; min-width:140px; text-align:center;}
+.summary-box .item .num{font-size:1.6rem; font-weight:800; color:var(--blue);}
+.summary-box .item .lbl{font-size:0.78rem; color:#666; margin-top:2px;}
+.position-info{background:#eef4fb; border:1px solid var(--blue-light); border-radius:8px; padding:12px 16px; margin-bottom:14px; font-size:0.88rem;}
+.position-info b{color:var(--blue-dark);}
+.login-wrap{min-height:80vh; display:flex; align-items:center; justify-content:center;}
+.login-card{background:#fff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.15); padding:34px 38px; width:100%; max-width:400px;}
+.login-card h2{text-align:center; color:var(--blue); border:none;}
+.login-card .btn{width:100%; margin-top:10px;}
+.access-denied{text-align:center; padding:60px 20px; color:#999;}
+.top-actions{display:flex; justify-content:flex-end; gap:8px; margin-bottom:12px; flex-wrap:wrap;}
+.scan-input-group{display:flex; gap:8px;}
+.scan-input-group input{flex:1;}
+.table-wrap{overflow-x:auto;}
+.item-row-new{animation:flash 1s ease;}
+@keyframes flash{0%{background:#d7f5e0;} 100%{background:transparent;}}
+.tag-free{background:#fbeee6; color:#b25e10; padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700;}
+footer{text-align:center; padding:20px; color:#98a2b3; font-size:0.8rem;}
+</style>
+</head>
+<body>
+
+<div id="toastWrap" class="toast-wrap"></div>
+
+<!-- ===================== TELA DE CONFIGURAÇÃO INICIAL (primeiro admin) ===================== -->
+<div id="setupScreen" class="hidden">
+  <div class="login-wrap">
+    <div class="login-card">
+      <h2>Configuração Inicial</h2>
+      <p class="muted center">Nenhum usuário cadastrado. Crie a conta do administrador do sistema.</p>
+      <div class="field"><label>Nome completo</label><input type="text" id="setupNome" placeholder="Ex: João Silva"></div>
+      <div class="field"><label>Login (usuário)</label><input type="text" id="setupLogin" placeholder="Ex: joao.silva"></div>
+      <div class="field"><label>Senha</label><input type="password" id="setupSenha" placeholder="Mínimo 4 caracteres"></div>
+      <div class="field"><label>Confirmar senha</label><input type="password" id="setupSenha2"></div>
+      <button class="btn" onclick="criarPrimeiroAdmin()">Criar Administrador</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== TELA DE LOGIN ===================== -->
+<div id="loginScreen" class="hidden">
+  <div class="login-wrap">
+    <div class="login-card">
+      <h2>📦 Contagem de Estoque</h2>
+      <div class="field"><label>Login</label><input type="text" id="loginUser" placeholder="Usuário" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus();"></div>
+      <div class="field"><label>Senha</label><input type="password" id="loginPass" placeholder="Senha" onkeydown="if(event.key==='Enter')fazerLogin();"></div>
+      <button class="btn" onclick="fazerLogin()">Entrar</button>
+      <p class="muted center" style="margin-top:14px;">Acesso restrito. Procure o administrador para criar seu usuário.</p>
+      <p class="center" style="margin-top:6px;"><a href="#" onclick="event.preventDefault(); abrirRecuperarSenha();" style="font-size:0.85rem;">Administrador esqueceu a senha?</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== TELA DE RECUPERAÇÃO DE SENHA (ADMINISTRADOR) ===================== -->
+<div id="recuperarSenhaScreen" class="hidden">
+  <div class="login-wrap">
+    <div class="login-card">
+      <h2>🔑 Recuperar Senha do Administrador</h2>
+      <p class="muted center">Informe o login da conta de administrador para definir uma nova senha.</p>
+
+      <div id="recSenhaPasso1">
+        <div class="field"><label>Login do Administrador</label>
+          <input type="text" id="recLogin" placeholder="Usuário" onkeydown="if(event.key==='Enter'){event.preventDefault(); buscarAdminParaRecuperarSenha();}">
+        </div>
+        <button class="btn" onclick="buscarAdminParaRecuperarSenha()">Buscar</button>
+      </div>
+
+      <div id="recSenhaPasso2" class="hidden">
+        <p class="muted center" id="recSenhaConfirmandoTexto"></p>
+        <div class="field"><label>Nova Senha</label><input type="password" id="recNovaSenha" placeholder="Mínimo 4 caracteres"></div>
+        <div class="field"><label>Confirmar Nova Senha</label>
+          <input type="password" id="recNovaSenha2" onkeydown="if(event.key==='Enter'){event.preventDefault(); salvarNovaSenhaRecuperacao();}">
+        </div>
+        <button class="btn" onclick="salvarNovaSenhaRecuperacao()">Salvar Nova Senha</button>
+      </div>
+
+      <button class="btn secondary" style="margin-top:10px;" onclick="cancelarRecuperarSenha()">Voltar para o login</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APP PRINCIPAL ===================== -->
+<div id="appScreen" class="hidden">
+  <header>
+    <div class="brand">
+      <h1>📦 Sistema de Contagem de Estoque</h1>
+    </div>
+    <div class="user-info">
+      <b id="hdrNome">-</b>
+      <span id="hdrPerfil" class="badge info">-</span>
+      <button class="btn secondary small" style="margin-left:10px;" onclick="fazerLogout()">Sair</button>
+    </div>
+  </header>
+  <nav id="mainNav">
+    <button data-aba="contagem" onclick="mostrarAba('contagem')" class="active">Contagem</button>
+    <button data-aba="usuarios" onclick="mostrarAba('usuarios')">Usuários</button>
+    <button data-aba="bases" onclick="mostrarAba('bases')">Carregar Bases</button>
+    <button data-aba="relatorios" onclick="mostrarAba('relatorios')">Relatórios</button>
+  </nav>
+
+  <main>
+
+    <!-- ============ ABA CONTAGEM ============ -->
+    <section id="aba-contagem" class="aba">
+      <div class="card">
+        <h2>Contagem por Posição</h2>
+        <div class="step-indicator">
+          <div class="step active" id="stepIndAtual">1. Posição</div>
+        </div>
+
+        <!-- STEP 1: POSIÇÃO -->
+        <div id="stepPosicao">
+          <div id="reconIndicadorBox" class="position-info hidden" style="background:#fff8e1; border-left:4px solid #f0ad4e;"></div>
+          <div class="field">
+            <label>Bipe ou digite a POSIÇÃO e pressione Enter</label>
+            <div class="scan-input-group">
+              <input type="text" id="inputPosicao" placeholder="Ex: OFI-001-01" autocomplete="off"
+                onkeydown="if(event.key==='Enter'){event.preventDefault(); confirmarPosicao();}">
+              <button class="btn scan" onclick="abrirCamera('inputPosicao', confirmarPosicao)">📷 Câmera</button>
+            </div>
+          </div>
+          <button class="btn" onclick="confirmarPosicao()">Confirmar Posição</button>
+        </div>
+
+        <!-- STEP 2: QUANTIDADE -->
+        <div id="stepQuantidade" class="hidden">
+          <div class="row" style="margin-bottom:16px;">
+            <button class="btn secondary" onclick="cancelarParaStep1()">Voltar</button>
+            <button class="btn" onclick="iniciarBipagem()">Iniciar Bipagem</button>
+          </div>
+          <div class="position-info" id="posInfoBox2"></div>
+          <div class="field">
+            <label>Quantidade a contar nesta posição <span class="tag-free">digite 0 se a posição estiver vazia</span></label>
+            <input type="number" id="inputQuantidade" min="0" step="1" placeholder="Ex: 10 (ou 0 se vazia)"
+              onkeydown="if(event.key==='Enter'){event.preventDefault(); iniciarBipagem();}">
+          </div>
+        </div>
+
+        <!-- STEP 3: BIPAGEM -->
+        <div id="stepBipagem" class="hidden">
+          <div class="position-info" style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+            <div id="posInfoBox3" style="flex:1; min-width:220px;"></div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn secondary small" onclick="corrigirQuantidadeInformada()">✏ Corrigir Quantidade Informada</button>
+              <button class="btn success small" onclick="confirmarConclusaoContagem()">✔ Confirmar Conclusão da Contagem</button>
+            </div>
+          </div>
+          <div class="summary-box">
+            <div class="item"><div class="num" id="sumBipados">0</div><div class="lbl">Bipados</div></div>
+            <div class="item"><div class="num" id="sumInformado">0</div><div class="lbl">Quantidade Informada</div></div>
+            <div class="item"><div class="num" id="sumFaltam">0</div><div class="lbl">Faltam</div></div>
+          </div>
+
+          <h3>Bipagem unidade a unidade</h3>
+          <div class="row">
+            <div class="field">
+              <label>SKU</label>
+              <input type="text" id="inputSku" placeholder="Código do produto"
+                onfocus="setCampoAtivo('inputSku')" onkeydown="if(event.key==='Enter'){event.preventDefault(); document.getElementById('inputLote').focus();}">
+            </div>
+            <div class="field">
+              <label>Lote</label>
+              <input type="text" id="inputLote" placeholder="Lote"
+                onfocus="setCampoAtivo('inputLote')" onkeydown="if(event.key==='Enter'){event.preventDefault(); document.getElementById('inputSerie').focus();}">
+            </div>
+            <div class="field">
+              <label>Série</label>
+              <input type="text" id="inputSerie" placeholder="Número de série"
+                onfocus="setCampoAtivo('inputSerie')" onkeydown="if(event.key==='Enter'){event.preventDefault(); onEnterCampoSerie();}"
+                oninput="delete this.dataset.serialCompleto;">
+            </div>
+            <div class="field">
+              <label>Campo Livre <span class="tag-free">opcional</span></label>
+              <input type="text" id="inputCampoLivre" placeholder="Observação / uso livre"
+                onfocus="setCampoAtivo('inputCampoLivre')" onkeydown="if(event.key==='Enter'){event.preventDefault(); adicionarItemBipado();}">
+            </div>
+          </div>
+
+          <div class="row" style="align-items:center;">
+            <div class="field" style="flex:2; min-width:280px;">
+              <label style="font-weight:normal; display:flex; align-items:center; gap:6px; margin-top:6px;">
+                <input type="checkbox" id="chkTravarSerie" style="width:auto;" disabled onchange="alternarModoTravarSerie()">
+                Bipar apenas por série — SKU e Lote não são utilizados neste modo
+              </label>
+            </div>
+            <div class="field" style="flex:2; min-width:280px;">
+              <label style="font-weight:normal; display:flex; align-items:center; gap:6px; margin-top:6px;">
+                <input type="checkbox" id="chkSemSerie" style="width:auto;" disabled onchange="alternarModoSemSerie()">
+                Produto sem série — informar a quantidade total do lote <span class="tag-free">exige SKU e Lote</span>
+              </label>
+            </div>
+            <div class="field hidden" id="wrapQtdLote">
+              <label>Quantidade do Lote</label>
+              <input type="number" id="inputQtdLote" min="1" step="1" placeholder="Ex: 50"
+                onkeydown="if(event.key==='Enter'){event.preventDefault(); adicionarItemBipado();}">
+            </div>
+          </div>
+          <p class="muted" style="margin-top:-6px;">🔒 Modo de bipagem definido pelo administrador — não pode ser alterado durante a contagem.</p>
+          <p class="muted" id="avisoTravarSerie" style="margin-top:-6px;"></p>
+
+          <div class="row" style="margin-bottom:16px;">
+            <button class="btn scan" onclick="abrirCameraCampoAtivo()">📷 Bipar com Câmera (para o campo em foco)</button>
+            <button class="btn success" onclick="adicionarItemBipado()">➕ Adicionar Item</button>
+            <button class="btn secondary" onclick="limparCamposItem()">Limpar Campos</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>SKU</th><th>Lote</th><th>Série</th><th>Qtd.</th><th>Campo Livre</th><th>Hora</th><th></th></tr></thead>
+              <tbody id="tabelaItensBipados"></tbody>
+            </table>
+          </div>
+
+          <div class="row" style="margin-top:18px;">
+            <button class="btn danger" onclick="cancelarContagemAtual()">Cancelar Contagem</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ABA USUÁRIOS (ADMIN) ============ -->
+    <section id="aba-usuarios" class="aba hidden">
+      <div class="card">
+        <h2>Cadastro de Usuários</h2>
+        <div class="row">
+          <div class="field"><label>Nome</label><input type="text" id="usrNome"></div>
+          <div class="field"><label>Login</label><input type="text" id="usrLogin"></div>
+          <div class="field"><label>Senha</label><input type="password" id="usrSenha"></div>
+          <div class="field">
+            <label>Perfil</label>
+            <select id="usrPerfil" onchange="toggleUsrPermReport()">
+              <option value="contador">Contador</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <div class="field" id="usrPermReportWrap">
+            <label>Permissão extra</label>
+            <label style="font-weight:normal; display:flex; align-items:center; gap:6px;">
+              <input type="checkbox" id="usrPermRelatorio" style="width:auto;"> Pode extrair relatórios
+            </label>
+          </div>
+        </div>
+        <button class="btn" onclick="salvarUsuario()">💾 Salvar Usuário</button>
+        <input type="hidden" id="usrEditId">
+
+        <h3 style="margin-top:24px;">Cadastro de Usuários em Massa (Excel)</h3>
+        <p class="muted">Planilha com colunas: Nome, Login, Senha, Perfil (Admin ou Contador), Permissão Relatório (Sim/Não). Logins já existentes são atualizados (nome, perfil e permissão; a senha só é alterada se for informada); logins novos são criados.</p>
+        <button class="btn secondary" onclick="baixarModeloUsuarios()">⬇ Baixar Modelo (Excel)</button>
+        <input type="file" id="fileUsuariosEmMassa" accept=".xlsx,.xls" style="display:none" onchange="importarUsuariosEmMassa(event)">
+        <button class="btn" onclick="document.getElementById('fileUsuariosEmMassa').click()">📂 Importar Usuários em Massa (.xlsx)</button>
+
+        <h3 style="margin-top:24px;">Usuários Cadastrados</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Relatórios</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tabelaUsuarios"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ABA CARREGAR BASES (ADMIN) ============ -->
+    <section id="aba-bases" class="aba hidden">
+      <div class="card">
+        <h2>Base de Layout de Posições</h2>
+        <p class="muted">Planilha com colunas: EMPRESA, POSIÇÃO, RUA, PREDIO, NIVEL, STATUS DA POSIÇÃO.</p>
+        <div class="summary-box">
+          <div class="item"><div class="num" id="qtdLayout">0</div><div class="lbl">Posições carregadas</div></div>
+          <div class="item"><div class="num muted" style="font-size:0.95rem;" id="dataLayout">-</div><div class="lbl">Última atualização</div></div>
+        </div>
+        <input type="file" id="fileLayout" accept=".xlsx,.xls" style="display:none" onchange="carregarLayout(event)">
+        <button class="btn" onclick="document.getElementById('fileLayout').click()">📂 Carregar / Substituir Layout (.xlsx)</button>
+        <button class="btn danger" onclick="limparLayout()">Limpar Base de Layout</button>
+      </div>
+
+      <div class="card">
+        <h2>Base de Posição de Estoque (Sistema)</h2>
+        <p class="muted">Planilha com colunas: CIA, SKU, STATUS, CONTROLA_LOTE?, LOTE, LOTE_STS, COMP, POSIÇÃO, RUA, COL, NVL, DESCRICAO, VALIDADE, LIVRE, RECEBIMENTO, TRANSITO, ALOCADO, CATEGORIA.</p>
+        <div class="summary-box">
+          <div class="item"><div class="num" id="qtdBaseSistema">0</div><div class="lbl">Registros carregados</div></div>
+          <div class="item"><div class="num muted" style="font-size:0.95rem;" id="dataBaseSistema">-</div><div class="lbl">Última atualização</div></div>
+        </div>
+        <input type="file" id="fileBaseSistema" accept=".xlsx,.xls" style="display:none" onchange="carregarBaseSistema(event)">
+        <button class="btn" onclick="document.getElementById('fileBaseSistema').click()">📂 Carregar / Substituir Base do Sistema (.xlsx)</button>
+        <button class="btn danger" onclick="limparBaseSistema()">Limpar Base do Sistema</button>
+      </div>
+
+      <div class="card">
+        <h2>Modo de Bipagem Obrigatório</h2>
+        <p class="muted">Define, para TODOS os contadores, qual das duas funções especiais de bipagem (etapa 3 da contagem) deve ser usada. O contador não escolhe: o sistema aplica automaticamente o modo definido aqui e exige que ele esteja configurado para permitir a criação de qualquer processo de contagem.</p>
+        <div class="field" style="max-width:420px;">
+          <label>Modo obrigatório para todos os contadores</label>
+          <select id="selModoBipagemObrigatorio" onchange="salvarModoBipagemObrigatorio()">
+            <option value="">-- Não configurado (bloqueia a contagem) --</option>
+            <option value="serie">Bipar apenas por Série — SKU e Lote não são utilizados</option>
+            <option value="semSerie">Produto sem Série — informar a quantidade total do lote</option>
+          </select>
+        </div>
+        <p class="muted" id="statusModoBipagemObrigatorio" style="margin-top:-6px;"></p>
+      </div>
+
+      <div class="card">
+        <h2>Backup / Restauração dos Dados</h2>
+        <p class="muted">Como o sistema roda localmente no navegador, use este backup para consolidar contagens feitas em aparelhos diferentes: exporte no aparelho de origem e importe no aparelho central.</p>
+        <button class="btn secondary" onclick="exportarBackupJSON()">⬇ Exportar Backup Completo (JSON)</button>
+        <input type="file" id="fileBackup" accept=".json" style="display:none" onchange="importarBackupJSON(event)">
+        <button class="btn secondary" onclick="document.getElementById('fileBackup').click()">⬆ Importar Backup (mescla contagens)</button>
+      </div>
+
+    </section>
+
+    <!-- ============ ABA RELATÓRIOS (ADMIN / PERMITIDO) ============ -->
+    <section id="aba-relatorios" class="aba hidden">
+      <div class="card">
+        <h2>Relatórios de Contagem</h2>
+        <div class="summary-box">
+          <div class="item"><div class="num" id="repTotalContagens">0</div><div class="lbl">Contagens Finalizadas</div></div>
+          <div class="item"><div class="num" id="repTotalItens">0</div><div class="lbl">Itens Bipados</div></div>
+          <div class="item"><div class="num" id="repPosPendentes">0</div><div class="lbl">Posições Pendentes (Layout)</div></div>
+          <div class="item"><div class="num" id="repDivergentes">0</div><div class="lbl">Posições Divergentes (Sistema)</div></div>
+        </div>
+        <div class="top-actions">
+          <button class="btn" onclick="exportarRelatorioCompleto()">📊 Exportar Relatório Completo (Excel)</button>
+          <button class="btn secondary" onclick="atualizarPainelRelatorios()">🔄 Atualizar</button>
+        </div>
+        <h3>Contagens Finalizadas</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Posição</th><th>Usuário</th><th>Qtd. Informada</th><th>Qtd. Bipada</th><th>Status</th><th>Início</th><th>Fim</th></tr></thead>
+            <tbody id="tabelaContagens"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ==== PAINEL DE PROGRESSO: LAYOUT x CONTAGEM (sem precisar exportar Excel) ==== -->
+      <div class="card">
+        <h2>Progresso da Contagem — Layout x Contagem</h2>
+        <p class="muted">Confronto em tempo real, direto no painel, entre as posições carregadas no Layout e as posições já contadas.</p>
+        <div class="summary-box">
+          <div class="item"><div class="num" id="progTotalLayout">0</div><div class="lbl">Total no Layout</div></div>
+          <div class="item"><div class="num" id="progContadas">0</div><div class="lbl">Posições Contadas</div></div>
+          <div class="item"><div class="num" id="progPendentes">0</div><div class="lbl">Posições Pendentes</div></div>
+          <div class="item"><div class="num" id="progPercentual">0%</div><div class="lbl">% Concluído</div></div>
+        </div>
+
+        <div class="row" style="align-items:flex-end;">
+          <div class="field" style="max-width:280px;">
+            <label>Buscar posição / rua / prédio</label>
+            <input type="text" id="progBusca" placeholder="Ex: OFI-001 ou RUA 002" oninput="renderizarTabelaProgresso()">
+          </div>
+          <div class="field" style="max-width:220px;">
+            <label>Filtrar por situação</label>
+            <select id="progFiltroSituacao" onchange="renderizarTabelaProgresso()">
+              <option value="TODAS">Todas</option>
+              <option value="PENDENTE">Somente Pendentes</option>
+              <option value="CONTADA">Somente Contadas</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-wrap" style="max-height:420px; overflow-y:auto;">
+          <table>
+            <thead><tr><th>Posição</th><th>Empresa</th><th>Rua</th><th>Prédio</th><th>Nível</th><th>Situação</th><th>Usuário</th><th>Data da Contagem</th></tr></thead>
+            <tbody id="tabelaProgressoLayout"></tbody>
+          </table>
+        </div>
+        <p class="muted" id="progRodape" style="margin-top:8px;"></p>
+      </div>
+
+      <!-- ==== RECONTAGEM DAS POSIÇÕES DIVERGENTES (ADMIN) ==== -->
+      <div class="card">
+        <h2>Recontagem das Posições Divergentes</h2>
+        <p class="muted">Gera uma 2ª contagem (recontagem) restrita apenas às posições que o confronto apontou como divergentes (quantidade contada diferente da quantidade do sistema), para conferência direcionada sem precisar recontar o inventário inteiro.</p>
+        <div class="summary-box">
+          <div class="item"><div class="num" id="reconTotal">0</div><div class="lbl">Posições na Lista</div></div>
+          <div class="item"><div class="num" id="reconPendentes">0</div><div class="lbl">Pendentes de Recontagem</div></div>
+          <div class="item"><div class="num" id="reconConcluidas">0</div><div class="lbl">Já Recontadas</div></div>
+        </div>
+        <div class="top-actions">
+          <button class="btn" onclick="gerarRecontagemDivergencias()">🔁 Gerar Recontagem das Divergências</button>
+          <button class="btn danger" onclick="limparRecontagem()">🗑 Limpar Lista de Recontagem</button>
+        </div>
+        <div class="table-wrap" style="max-height:320px; overflow-y:auto;">
+          <table>
+            <thead><tr><th>Posição</th><th>Qtd. Sistema</th><th>Qtd. Contada (na geração)</th><th>Status</th><th>Qtd. Recontada</th><th>Gerada em</th></tr></thead>
+            <tbody id="tabelaRecontagem"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ==== LIMPEZA DAS CONTAGENS (ADMIN) ==== -->
+      <div class="card">
+        <h2>Limpeza das Contagens</h2>
+        <p class="muted">Apaga o histórico de contagens já realizadas (finalizadas ou em andamento), zerando o progresso para começar um novo inventário. Esta ação não afeta o Layout, a Base do Sistema nem os usuários cadastrados. <b>Recomenda-se exportar um backup ou o relatório completo antes de limpar.</b></p>
+        <div class="summary-box">
+          <div class="item"><div class="num" id="qtdContagensRegistradas">0</div><div class="lbl">Contagens Registradas</div></div>
+        </div>
+        <button class="btn danger" onclick="limparContagens()">🗑 Limpar Todas as Contagens</button>
+      </div>
+    </section>
+
+    <div id="acessoNegado" class="access-denied hidden">
+      <h2>🔒 Acesso restrito</h2>
+      <p>Seu perfil não tem permissão para acessar esta área.</p>
+    </div>
+
+  </main>
+  <footer>Sistema de Contagem de Estoque — dados armazenados localmente no navegador (IndexedDB)</footer>
+</div>
+
+<!-- ===================== MODAL CÂMERA ===================== -->
+<div id="cameraModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>📷 Escaneamento por Câmera</h3>
+    <p class="muted" id="cameraTargetLabel">Aponte a câmera para o código de barras (CODE128) ou QR Code.</p>
+    <div id="qr-reader-container"></div>
+    <p id="statusConfirmacaoLeitura" style="margin-top:6px; font-weight:bold; min-height:1.2em;"></p>
+    <p class="muted" style="margin-top:6px;">Se a imagem estiver desfocada, afaste um pouco o celular do código, toque em "🔍 Forçar Foco" ou use o zoom abaixo.</p>
+    <div class="row" id="cameraZoomWrap" style="align-items:center; gap:8px; display:none;">
+      <span class="muted" style="white-space:nowrap;">🔍 Zoom</span>
+      <input type="range" id="cameraZoomRange" min="1" max="1" step="0.1" value="1" style="width:100%;" oninput="ajustarZoomCamera(this.value)">
+    </div>
+    <div class="row" style="gap:8px; margin-top:10px;">
+      <button class="btn secondary" style="flex:1;" onclick="forcarFocoCamera()">🔍 Forçar Foco</button>
+      <button class="btn danger" style="flex:1;" onclick="fecharCamera()">Fechar Câmera</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   SISTEMA DE CONTAGEM DE ESTOQUE
+   - IndexedDB para persistência local (usuários, layout, base sistema, contagens)
+   - html5-qrcode para leitura de CODE128 e QRCode via câmera
+   - SheetJS (xlsx) para importação e exportação de planilhas
+   ========================================================================= */
+
+const DB_NAME = 'ContagemEstoqueDB';
+const DB_VERSION = 2;
+let db = null;
+
+function abrirBanco(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = function(ev){
+      const d = ev.target.result;
+      if(!d.objectStoreNames.contains('usuarios')) d.createObjectStore('usuarios', {keyPath:'id', autoIncrement:true});
+      if(!d.objectStoreNames.contains('layout')) d.createObjectStore('layout', {keyPath:'posicao'});
+      if(!d.objectStoreNames.contains('baseSistema')) d.createObjectStore('baseSistema', {keyPath:'id', autoIncrement:true});
+      if(!d.objectStoreNames.contains('contagens')) d.createObjectStore('contagens', {keyPath:'id', autoIncrement:true});
+      if(!d.objectStoreNames.contains('config')) d.createObjectStore('config', {keyPath:'chave'});
+      // v2: lista de recontagem (2ª contagem apenas das posições que apresentaram divergência no confronto)
+      if(!d.objectStoreNames.contains('recontagem')) d.createObjectStore('recontagem', {keyPath:'posicao'});
+    };
+    req.onsuccess = function(ev){ db = ev.target.result; resolve(db); };
+    req.onerror = function(ev){ reject(ev.target.error); };
+  });
+}
+
+function dbGetAll(storeName){
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).getAll();
+    req.onsuccess = ()=> resolve(req.result || []);
+    req.onerror = (ev)=> reject(ev.target.error);
+  });
+}
+function dbGet(storeName, key){
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).get(key);
+    req.onsuccess = ()=> resolve(req.result || null);
+    req.onerror = (ev)=> reject(ev.target.error);
+  });
+}
+function dbPut(storeName, obj){
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(storeName, 'readwrite');
+    const req = tx.objectStore(storeName).put(obj);
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = (ev)=> reject(ev.target.error);
+  });
+}
+function dbDelete(storeName, key){
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(storeName, 'readwrite');
+    const req = tx.objectStore(storeName).delete(key);
+    req.onsuccess = ()=> resolve();
+    req.onerror = (ev)=> reject(ev.target.error);
+  });
+}
+function dbClear(storeName){
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(storeName, 'readwrite');
+    const req = tx.objectStore(storeName).clear();
+    req.onsuccess = ()=> resolve();
+    req.onerror = (ev)=> reject(ev.target.error);
+  });
+}
+function dbBulkPut(storeName, arr){
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    arr.forEach(o=> store.put(o));
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = (ev)=> reject(ev.target.error);
+  });
+}
+
+/* ---------------- Utilitários ---------------- */
+function mostrarToast(msg, tipo){
+  tipo = tipo || 'info';
+  const wrap = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = 'toast ' + tipo;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 4200);
+}
+function agora(){ return new Date().toISOString(); }
+function formatarDataHora(iso){
+  if(!iso) return '-';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR');
+}
+function normalizar(s){
+  return (s===undefined || s===null) ? '' : String(s).trim().toUpperCase();
+}
+// Normaliza uma POSIÇÃO para fins de COMPARAÇÃO/BUSCA (nunca para exibição):
+// além do trim+maiúsculas do normalizar(), remove os traços "-", para que o
+// sistema reconheça a mesma posição informada COM ou SEM os traços separadores
+// (ex.: "OFI-001-01" e "OFI00101" apontam para a mesma posição).
+function normalizarPosicao(s){
+  return normalizar(s).replace(/-/g, '');
+}
+async function sha256(texto){
+  const enc = new TextEncoder().encode(texto);
+  const hashBuf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ---------------- Sessão ---------------- */
+let usuarioLogado = null; // {id, nome, login, perfil, podeExtrairRelatorio}
+
+function ehAdmin(){ return usuarioLogado && usuarioLogado.perfil === 'admin'; }
+function podeExtrairRelatorio(){ return usuarioLogado && (usuarioLogado.perfil === 'admin' || !!usuarioLogado.podeExtrairRelatorio); }
+
+async function salvarSessao(){
+  await dbPut('config', {chave:'sessaoUsuarioId', valor: usuarioLogado ? usuarioLogado.id : null});
+}
+async function restaurarSessao(){
+  const cfg = await dbGet('config', 'sessaoUsuarioId');
+  if(cfg && cfg.valor){
+    const u = await dbGet('usuarios', cfg.valor);
+    if(u && u.ativo !== false){
+      usuarioLogado = {id:u.id, nome:u.nome, login:u.login, perfil:u.perfil, podeExtrairRelatorio: !!u.podeExtrairRelatorio};
+      return true;
+    }
+  }
+  return false;
+}
+
+/* ---------------- Inicialização ---------------- */
+window.addEventListener('DOMContentLoaded', async ()=>{
+  await abrirBanco();
+  const usuarios = await dbGetAll('usuarios');
+  if(usuarios.length === 0){
+    document.getElementById('setupScreen').classList.remove('hidden');
+    return;
+  }
+  const restaurado = await restaurarSessao();
+  if(restaurado){
+    entrarNoApp();
+  } else {
+    document.getElementById('loginScreen').classList.remove('hidden');
+  }
+});
+
+/* ---------------- Setup inicial (primeiro admin) ---------------- */
+async function criarPrimeiroAdmin(){
+  const nome = document.getElementById('setupNome').value.trim();
+  const login = document.getElementById('setupLogin').value.trim();
+  const senha = document.getElementById('setupSenha').value;
+  const senha2 = document.getElementById('setupSenha2').value;
+  if(!nome || !login || !senha){ mostrarToast('Preencha todos os campos.', 'error'); return; }
+  if(senha.length < 4){ mostrarToast('A senha deve ter ao menos 4 caracteres.', 'error'); return; }
+  if(senha !== senha2){ mostrarToast('As senhas não conferem.', 'error'); return; }
+  const senhaHash = await sha256(senha);
+  const id = await dbPut('usuarios', {nome, login, senhaHash, perfil:'admin', podeExtrairRelatorio:true, ativo:true, criadoEm: agora()});
+  usuarioLogado = {id, nome, login, perfil:'admin', podeExtrairRelatorio:true};
+  await salvarSessao();
+  document.getElementById('setupScreen').classList.add('hidden');
+  mostrarToast('Administrador criado com sucesso!', 'ok');
+  entrarNoApp();
+}
+
+/* ---------------- Login / logout ---------------- */
+async function fazerLogin(){
+  const login = document.getElementById('loginUser').value.trim();
+  const senha = document.getElementById('loginPass').value;
+  if(!login || !senha){ mostrarToast('Informe login e senha.', 'error'); return; }
+  const usuarios = await dbGetAll('usuarios');
+  const u = usuarios.find(x=> normalizar(x.login) === normalizar(login));
+  if(!u || u.ativo === false){ mostrarToast('Usuário não encontrado ou inativo.', 'error'); return; }
+  const senhaHash = await sha256(senha);
+  if(senhaHash !== u.senhaHash){ mostrarToast('Senha incorreta.', 'error'); return; }
+  usuarioLogado = {id:u.id, nome:u.nome, login:u.login, perfil:u.perfil, podeExtrairRelatorio: !!u.podeExtrairRelatorio};
+  await salvarSessao();
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('loginUser').value=''; document.getElementById('loginPass').value='';
+  entrarNoApp();
+}
+async function fazerLogout(){
+  usuarioLogado = null;
+  await salvarSessao();
+  document.getElementById('appScreen').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+/* ---------------- Recuperação de senha (apenas ADMINISTRADOR) ----------------
+   O sistema roda 100% local, sem backend/e-mail para confirmar identidade —
+   por isso a recuperação fica restrita a contas com perfil ADMINISTRADOR (o
+   cadastro dos contadores continua sendo alterado pelo próprio admin, na aba
+   Usuários). O fluxo abre uma tela própria: primeiro localiza a conta pelo
+   login informado, depois libera os campos para definir a nova senha. */
+let adminEmRecuperacao = null;
+
+function abrirRecuperarSenha(){
+  adminEmRecuperacao = null;
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('recSenhaPasso1').classList.remove('hidden');
+  document.getElementById('recSenhaPasso2').classList.add('hidden');
+  document.getElementById('recLogin').value = '';
+  document.getElementById('recNovaSenha').value = '';
+  document.getElementById('recNovaSenha2').value = '';
+  document.getElementById('recuperarSenhaScreen').classList.remove('hidden');
+  setTimeout(()=> document.getElementById('recLogin')?.focus(), 50);
+}
+
+function cancelarRecuperarSenha(){
+  adminEmRecuperacao = null;
+  document.getElementById('recuperarSenhaScreen').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+async function buscarAdminParaRecuperarSenha(){
+  const login = document.getElementById('recLogin').value.trim();
+  if(!login){ mostrarToast('Informe o login do administrador.', 'error'); return; }
+  const usuarios = await dbGetAll('usuarios');
+  const u = usuarios.find(x=> normalizar(x.login) === normalizar(login) && x.perfil === 'admin');
+  if(!u){ mostrarToast('Login não encontrado ou não é uma conta de administrador.', 'error'); return; }
+  if(u.ativo === false){ mostrarToast('Esta conta de administrador está inativa. Procure outro administrador ativo.', 'error'); return; }
+  adminEmRecuperacao = u;
+  document.getElementById('recSenhaConfirmandoTexto').textContent = 'Definindo nova senha para: ' + u.nome + ' (' + u.login + ')';
+  document.getElementById('recSenhaPasso1').classList.add('hidden');
+  document.getElementById('recSenhaPasso2').classList.remove('hidden');
+  setTimeout(()=> document.getElementById('recNovaSenha')?.focus(), 50);
+}
+
+async function salvarNovaSenhaRecuperacao(){
+  if(!adminEmRecuperacao){ mostrarToast('Busque o login novamente.', 'error'); return; }
+  const novaSenha = document.getElementById('recNovaSenha').value;
+  const novaSenha2 = document.getElementById('recNovaSenha2').value;
+  if(!novaSenha || novaSenha.length < 4){ mostrarToast('A nova senha deve ter ao menos 4 caracteres.', 'error'); return; }
+  if(novaSenha !== novaSenha2){ mostrarToast('As senhas não conferem.', 'error'); return; }
+
+  const registro = await dbGet('usuarios', adminEmRecuperacao.id);
+  if(!registro){ mostrarToast('Usuário não encontrado (pode ter sido removido). Procure outro administrador.', 'error'); return; }
+  registro.senhaHash = await sha256(novaSenha);
+  await dbPut('usuarios', registro);
+
+  mostrarToast('Nova senha definida com sucesso! Faça login com a nova senha.', 'ok');
+  const loginRecuperado = registro.login;
+  adminEmRecuperacao = null;
+  document.getElementById('recuperarSenhaScreen').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginUser').value = loginRecuperado;
+  document.getElementById('loginPass').value = '';
+  setTimeout(()=> document.getElementById('loginPass')?.focus(), 50);
+}
+
+function entrarNoApp(){
+  document.getElementById('hdrNome').textContent = usuarioLogado.nome;
+  const badge = document.getElementById('hdrPerfil');
+  badge.textContent = usuarioLogado.perfil === 'admin' ? 'Administrador' : 'Contador';
+  badge.className = 'badge ' + (usuarioLogado.perfil === 'admin' ? 'admin' : 'info');
+  aplicarPermissoesNav();
+  document.getElementById('appScreen').classList.remove('hidden');
+  mostrarAba('contagem');
+  atualizarPainelBases();
+  resetarFluxoContagem();
+}
+
+function aplicarPermissoesNav(){
+  const botoes = document.querySelectorAll('#mainNav button');
+  botoes.forEach(b=>{
+    const aba = b.dataset.aba;
+    if(aba === 'contagem'){ b.classList.remove('hidden'); return; }
+    if(aba === 'usuarios' || aba === 'bases'){
+      b.classList.toggle('hidden', !ehAdmin());
+    }
+    if(aba === 'relatorios'){
+      b.classList.toggle('hidden', !podeExtrairRelatorio());
+    }
+  });
+}
+
+function mostrarAba(nome){
+  const permitido = (nome === 'contagem')
+    || (['usuarios','bases'].includes(nome) && ehAdmin())
+    || (nome === 'relatorios' && podeExtrairRelatorio());
+
+  document.querySelectorAll('#mainNav button').forEach(b=> b.classList.toggle('active', b.dataset.aba === nome));
+  document.querySelectorAll('.aba').forEach(s=> s.classList.add('hidden'));
+  document.getElementById('acessoNegado').classList.add('hidden');
+
+  if(!permitido){
+    document.getElementById('acessoNegado').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('aba-' + nome).classList.remove('hidden');
+  if(nome === 'usuarios') carregarTabelaUsuarios();
+  if(nome === 'bases') atualizarPainelBases();
+  if(nome === 'relatorios') atualizarPainelRelatorios();
+  if(nome === 'contagem'){
+    setTimeout(()=> document.getElementById('inputPosicao')?.focus(), 50);
+    dbGetAll('recontagem').then(lista=> atualizarIndicadorRecontagemContagem(lista.filter(r=> r.status==='pendente')));
+  }
+}
+
+/* =========================================================================
+   CÂMERA (html5-qrcode) — leitura de CODE128 e QRCode
+   ========================================================================= */
+let html5QrCode = null;
+let campoAtivo = 'inputSku';
+let callbackAoEscanear = null;
+
+// Confirmação por leituras consecutivas: uma única leitura de um frame de
+// vídeo (principalmente em códigos de barras 1D como CODE128, lidos por um
+// decodificador de imagem em condições de foco/luz variáveis) pode produzir
+// um resultado incorreto ocasional ("aleatório"). Para garantir que o valor
+// aplicado ao campo é FIELMENTE o que está gravado no código, só aceitamos o
+// resultado depois que a MESMA leitura se repetir em frames consecutivos —
+// um erro de decodificação isolado não se repete duas vezes seguidas de
+// forma idêntica, enquanto uma leitura real e estável, sim. QR Code já tem
+// correção de erro embutida no próprio padrão e não costuma "inventar"
+// caracteres, por isso exige só 1 leitura; códigos de barras lineares (1D)
+// exigem 2 leituras idênticas em sequência antes de aceitar o valor.
+let ultimoCodigoLido = null;
+let leiturasConsecutivas = 0;
+const LEITURAS_NECESSARIAS_QRCODE = 1;
+const LEITURAS_NECESSARIAS_BARCODE = 2;
+
+function resetarConfirmacaoLeitura(){
+  ultimoCodigoLido = null;
+  leiturasConsecutivas = 0;
+  const status = document.getElementById('statusConfirmacaoLeitura');
+  if(status) status.textContent = '';
+}
+
+function setCampoAtivo(idCampo){ campoAtivo = idCampo; }
+
+function abrirCamera(idCampoDestino, callback){
+  campoAtivo = idCampoDestino;
+  callbackAoEscanear = callback || null;
+  document.getElementById('cameraTargetLabel').textContent = 'Escaneando para o campo: ' + idCampoDestino;
+  _abrirCameraModal();
+}
+function abrirCameraCampoAtivo(){
+  callbackAoEscanear = null;
+  document.getElementById('cameraTargetLabel').textContent = 'Escaneando para o campo em foco: ' + campoAtivo;
+  _abrirCameraModal();
+}
+
+function _abrirCameraModal(){
+  if(typeof Html5Qrcode === 'undefined'){
+    mostrarToast('Biblioteca de câmera não carregada. Verifique sua conexão com a internet.', 'error');
+    return;
+  }
+  document.getElementById('cameraModal').classList.remove('hidden');
+  document.getElementById('cameraZoomWrap').style.display = 'none';
+  resetarConfirmacaoLeitura();
+  html5QrCode = new Html5Qrcode('qr-reader-container');
+  const config = {
+    fps: 12,
+    qrbox: {width:260, height:160},
+    // Resolução mais alta e foco automático contínuo: o padrão da biblioteca
+    // costuma pedir um vídeo em resolução baixa, o que deixa códigos de barras
+    // (principalmente CODE128 lidos de perto) desfocados/ilegíveis em vários
+    // celulares. Pedimos aqui uma resolução maior e, quando o hardware
+    // suportar, foco automático contínuo (em vez de foco fixo/único).
+    videoConstraints: {
+      facingMode: {ideal: 'environment'},
+      width: {ideal: 1920},
+      height: {ideal: 1080},
+      advanced: [{focusMode: 'continuous'}]
+    },
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.QR_CODE,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.CODE_93,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.CODABAR
+    ]
+  };
+  html5QrCode.start({facingMode:'environment'}, config, onScanSuccess, onScanError)
+    .then(()=>{
+      // Alguns celulares ligam a câmera já com foco contínuo; em outros é
+      // preciso reforçar a constraint depois que a trilha de vídeo já está
+      // ativa, e/ou expor o controle de zoom (aproximar ajuda muito a nitidez
+      // de códigos de barras pequenos, quando o hardware suporta zoom).
+      aplicarFocoContinuo();
+      configurarZoomCamera();
+    })
+    .catch(err=>{
+      mostrarToast('Não foi possível acessar a câmera: ' + err, 'error');
+      document.getElementById('cameraModal').classList.add('hidden');
+    });
+}
+
+// Tenta (re)aplicar foco automático contínuo na trilha de vídeo em execução,
+// usando a API pública da biblioteca (Html5Qrcode.applyVideoConstraints). É
+// seguro chamar mesmo quando o hardware/navegador não suporta a capability —
+// a Promise apenas rejeita silenciosamente nesse caso.
+function aplicarFocoContinuo(){
+  if(!html5QrCode || typeof html5QrCode.applyVideoConstraints !== 'function') return;
+  try{
+    html5QrCode.applyVideoConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
+  }catch(e){ /* ignora - nem todo navegador suporta */ }
+}
+
+// Botão "Forçar Foco": além de tentar reafirmar o foco contínuo, alterna
+// rapidamente para foco automático de disparo único e de volta — em vários
+// aparelhos Android isso "acorda" a lente e refaz a medição de foco, sendo
+// útil quando o foco travou desfocado logo ao abrir a câmera.
+function forcarFocoCamera(){
+  if(!html5QrCode || typeof html5QrCode.applyVideoConstraints !== 'function'){
+    mostrarToast('Este dispositivo/navegador não permite controlar o foco manualmente. Tente afastar um pouco a câmera do código.', 'info');
+    return;
+  }
+  Promise.resolve()
+    .then(()=> html5QrCode.applyVideoConstraints({advanced:[{focusMode:'single-shot'}]}))
+    .catch(()=>{})
+    .then(()=> new Promise(r=> setTimeout(r, 250)))
+    .then(()=> html5QrCode.applyVideoConstraints({advanced:[{focusMode:'continuous'}]}))
+    .catch(()=>{});
+}
+
+// Exibe e configura o controle de zoom quando a câmera ativa suporta a
+// capability "zoom" (via Html5Qrcode.getRunningTrackCameraCapabilities) —
+// aproximar a imagem ajuda bastante a leitura de códigos de barras pequenos
+// ou quando o foco automático não estabiliza.
+function configurarZoomCamera(){
+  const wrap = document.getElementById('cameraZoomWrap');
+  const range = document.getElementById('cameraZoomRange');
+  if(!html5QrCode || typeof html5QrCode.getRunningTrackCameraCapabilities !== 'function'){
+    wrap.style.display = 'none'; return;
+  }
+  let caps;
+  try{ caps = html5QrCode.getRunningTrackCameraCapabilities(); }catch(e){ caps = null; }
+  const zoomCap = caps && typeof caps.zoomFeature === 'function' ? caps.zoomFeature() : null;
+  if(!zoomCap || !zoomCap.isSupported()){ wrap.style.display = 'none'; return; }
+  range.min = zoomCap.min();
+  range.max = zoomCap.max();
+  range.step = zoomCap.step() || 0.1;
+  range.value = zoomCap.value() || zoomCap.min();
+  wrap.style.display = 'flex';
+}
+
+function ajustarZoomCamera(valor){
+  if(!html5QrCode || typeof html5QrCode.getRunningTrackCameraCapabilities !== 'function') return;
+  try{
+    const caps = html5QrCode.getRunningTrackCameraCapabilities();
+    const zoomCap = caps && typeof caps.zoomFeature === 'function' ? caps.zoomFeature() : null;
+    if(zoomCap && zoomCap.isSupported()) zoomCap.apply(parseFloat(valor)).catch(()=>{});
+  }catch(e){ /* ignora */ }
+}
+
+function onScanSuccess(decodedText, resultado){
+  // Exige leitura(s) consecutiva(s) idêntica(s) antes de aceitar o valor —
+  // ver comentário junto à declaração de ultimoCodigoLido/leiturasConsecutivas.
+  const formatName = (resultado && resultado.result && resultado.result.format && resultado.result.format.formatName) || '';
+  const ehQrCode = formatName === 'QR_CODE';
+  const leiturasNecessarias = ehQrCode ? LEITURAS_NECESSARIAS_QRCODE : LEITURAS_NECESSARIAS_BARCODE;
+
+  if(decodedText === ultimoCodigoLido){
+    leiturasConsecutivas++;
+  } else {
+    ultimoCodigoLido = decodedText;
+    leiturasConsecutivas = 1;
+  }
+
+  const status = document.getElementById('statusConfirmacaoLeitura');
+  if(leiturasConsecutivas < leiturasNecessarias){
+    if(status) status.textContent = '🔎 Confirmando leitura (' + leiturasConsecutivas + '/' + leiturasNecessarias + ')... mantenha o código parado e enquadrado.';
+    return; // ainda não confirmado — continua escaneando sem aplicar o valor
+  }
+  if(status) status.textContent = '✔ Leitura confirmada!';
+  resetarConfirmacaoLeitura();
+
+  try{ navigator.vibrate && navigator.vibrate(80); }catch(e){}
+  const campo = document.getElementById(campoAtivo);
+  if(campo) campo.value = decodedText;
+  fecharCamera();
+  // Guarda o código completo bipado (bruto, antes de qualquer extração) para
+  // uso exclusivo no relatório de extração — não é exibido na tela de bipagem.
+  if(campoAtivo === 'inputSerie'){
+    campo.dataset.serialCompleto = (decodedText||'').trim();
+  }
+  // tenta decompor código GS1-128 automaticamente se aplicável (apenas na etapa de bipagem)
+  let ehGS1 = false;
+  if(['inputSku','inputLote','inputSerie'].includes(campoAtivo)){
+    ehGS1 = tentarDecompoGS1(decodedText);
+  }
+  // Se o campo em foco for a Série e o código não for um GS1-128 reconhecido,
+  // aplica a fórmula de extração de serial pelo tamanho do código lido — e,
+  // antes de truncar, usa o código bruto para também extrair e preencher o
+  // campo Lote (produtos controlados por série trazem o lote embutido no
+  // próprio código bipado).
+  if(campoAtivo === 'inputSerie' && !ehGS1){
+    preencherLoteAutomaticoDaSerie(campo.value);
+    campo.value = extrairSerial(campo.value);
+  }
+  // No modo travado por série, bipar a câmera no campo Série já adiciona o item direto.
+  if(campoAtivo === 'inputSerie' && document.getElementById('chkTravarSerie')?.checked){
+    adicionarItemBipado();
+  }
+  if(callbackAoEscanear){ callbackAoEscanear(); }
+}
+function onScanError(){ /* ignora frames sem leitura */ }
+
+function fecharCamera(){
+  if(html5QrCode){
+    html5QrCode.stop().then(()=>{ html5QrCode.clear(); html5QrCode=null; }).catch(()=>{ html5QrCode=null; });
+  }
+  document.getElementById('cameraModal').classList.add('hidden');
+}
+
+/* Tenta interpretar um código GS1-128 (Application Identifiers) contendo
+   GTIN(01), VALIDADE(17), LOTE(10) e SERIAL(21), preenchendo automaticamente
+   os campos SKU / Lote / Série quando o padrão é reconhecido.
+   Retorna true se o código era um GS1-128 reconhecido, false caso contrário. */
+function tentarDecompoGS1(codigo){
+  if(!codigo) return false;
+  let texto = codigo.replace(/\x1D/g, '|'); // GS separator -> delimitador simples
+  const aiRegex = /\((\d{2,4})\)([^\(]*)/g;
+  let match; let encontrados = {};
+  while((match = aiRegex.exec(texto)) !== null){
+    encontrados[match[1]] = match[2].replace(/\|/g,'').trim();
+  }
+  if(Object.keys(encontrados).length === 0) return false; // não é GS1 com parênteses, mantém como está
+  if(encontrados['01']) document.getElementById('inputSku').value = encontrados['01'];
+  if(encontrados['10']) document.getElementById('inputLote').value = encontrados['10'];
+  if(encontrados['21']) document.getElementById('inputSerie').value = encontrados['21'];
+  return true;
+}
+
+/* Extrai o número de série a partir do código bruto lido (câmera, leitora ou
+   digitado), de acordo com o tamanho total do código — cada tamanho de código
+   corresponde a um layout de etiqueta diferente, com o serial em uma posição
+   fixa dentro da string. */
+function extrairSerial(codigo){
+  codigo = (codigo||'').trim();
+  const n = codigo.length;
+  switch(n){
+    case 35: return codigo.substr(0,8);
+    case 36: return codigo.substr(0,9);
+    case 39: return codigo.substr(0,9);
+    case 42: return codigo.substr(0,9);
+    case 43: return codigo.substr(0,9);
+    case 44: return codigo.substr(0,9);
+    case 46: return codigo.substr(0,9);
+    case 47: return codigo.substr(0,9);
+    case 48: return codigo.substr(0,9);
+    case 49: return codigo.substr(18,8);
+    case 51: return codigo.substr(43,8);
+    case 52: return codigo.slice(-9);
+    case 53: return codigo.substr(44,9);
+    case 58: return codigo.slice(-9);
+    case 59: return codigo.slice(-9);
+    case 21: return codigo.substr(2,11);
+    default:
+      return (n > 11) ? codigo.substr(2,11) : codigo;
+  }
+}
+
+/* Extrai o LOTE embutido no código bipado da Série, de acordo com o tamanho
+   total do código — mesma lógica de "layout de etiqueta por tamanho" usada em
+   extrairSerial(), só que aqui devolvendo o trecho correspondente ao LOTE.
+   Fórmula fornecida pelo usuário (Excel: NÚM.CARACT = LEN, EXT.TEXTO = MID
+   1-indexado); os índices abaixo já convertidos para 0-based (substr). Usada
+   apenas em produtos controlados por SÉRIE, para preencher automaticamente o
+   campo Lote a partir da própria bipagem da série (sem precisar bipar/digitar
+   o lote separadamente). Tamanhos não mapeados aqui retornam null — o campo
+   Lote não é alterado nesse caso. */
+function extrairLote(codigo){
+  codigo = (codigo||'').trim();
+  const n = codigo.length;
+  switch(n){
+    case 35: return codigo.substr(14,13);
+    case 39: return codigo.substr(15,13);
+    case 42: return codigo.substr(13,13);
+    case 43: return codigo.substr(13,14);
+    case 44: return codigo.substr(14,14);
+    case 46: return codigo.substr(15,14);
+    case 47: return codigo.substr(15,14);
+    case 48: return codigo.substr(16,14);
+    case 51: return codigo.substr(29,13);
+    case 52: return codigo.substr(29,13);
+    case 58: return codigo.substr(34,13);
+    case 59: return codigo.substr(34,14);
+    case 49: return codigo.substr(28,13);
+    case 53: return codigo.substr(34,7);
+    case 36: return codigo.substr(26,7);
+    case 37: return codigo.substr(27,7);
+    case 20: return codigo.substr(10,7);
+    case 10: return codigo.substr(0,7);
+    default: return null;
+  }
+}
+
+// Aplica extrairLote() ao código bruto bipado na Série e, se houver
+// correspondência mapeada, preenche automaticamente o campo Lote — para
+// qualquer produto controlado por série (inclusive no modo "Bipar apenas por
+// série", já que é justamente ali que a bipagem acontece exclusivamente pela
+// Série; o campo Lote é apenas preenchido/exibido, sem exigir digitação do
+// operador). Não se aplica quando o código lido era um GS1-128 reconhecido,
+// pois nesse caso o Lote já vem do próprio AI(10) decodificado pela função
+// tentarDecompoGS1().
+// IMPORTANTE: quando o tamanho do código não tem correspondência mapeada em
+// extrairLote(), o campo Lote é explicitamente ESVAZIADO (não deve manter o
+// valor deixado pela bipagem anterior — cada bipagem de série é independente).
+// Também avisa o operador nesse caso, mostrando o tamanho do código lido —
+// isso ajuda a identificar rapidamente quando um formato de etiqueta novo
+// (tamanho ainda não cadastrado em extrairLote()) precisa ser adicionado.
+function preencherLoteAutomaticoDaSerie(codigoBruto){
+  const codigoLimpo = (codigoBruto || '').trim();
+  const lote = extrairLote(codigoLimpo);
+  const campoLote = document.getElementById('inputLote');
+  if(!campoLote) return;
+  if(lote === null || lote === ''){
+    campoLote.value = '';
+    mostrarToast('⚠ Lote não localizado automaticamente: o código bipado tem ' + codigoLimpo.length + ' caractere(s), tamanho ainda não mapeado na fórmula de extração.', 'info');
+  } else {
+    campoLote.value = lote;
+  }
+}
+
+/* =========================================================================
+   FLUXO DE CONTAGEM
+   ========================================================================= */
+let contagemAtual = null; // {posicao, quantidadeInformada, itens:[], usuarioId, usuarioNome, dataInicio}
+let layoutIndex = null; // Map posicao->registro (cache em memória)
+
+async function carregarLayoutIndex(){
+  const registros = await dbGetAll('layout');
+  // Chave de busca ignora traços "-", para reconhecer a posição bipada/digitada
+  // com ou sem eles (ex.: "OFI-001-01" e "OFI00101" são a mesma posição).
+  layoutIndex = new Map(registros.map(r=> [normalizarPosicao(r.posicao), r]));
+  return layoutIndex;
+}
+
+// Mostra apenas a etapa atual no indicador (1. Posição / 2. Quantidade /
+// 3. Bipagem), sem exibir as demais etapas ao mesmo tempo.
+function mostrarEtapaIndicador(numero, texto){
+  document.getElementById('stepIndAtual').textContent = numero + '. ' + texto;
+}
+
+function resetarFluxoContagem(){
+  contagemAtual = null;
+  document.getElementById('stepPosicao').classList.remove('hidden');
+  document.getElementById('stepQuantidade').classList.add('hidden');
+  document.getElementById('stepBipagem').classList.add('hidden');
+  document.getElementById('inputPosicao').value = '';
+  document.getElementById('inputQuantidade').value = '';
+  mostrarEtapaIndicador(1, 'Posição');
+  const chkTravarSerie = document.getElementById('chkTravarSerie');
+  if(chkTravarSerie){ chkTravarSerie.checked = false; alternarModoTravarSerie(); }
+  const chkSemSerie = document.getElementById('chkSemSerie');
+  if(chkSemSerie){ chkSemSerie.checked = false; alternarModoSemSerie(); }
+  document.getElementById('inputSku').value = '';
+  document.getElementById('inputLote').value = '';
+  setTimeout(()=> document.getElementById('inputPosicao')?.focus(), 50);
+}
+
+async function confirmarPosicao(){
+  const valor = document.getElementById('inputPosicao').value.trim();
+  if(!valor){ mostrarToast('Digite ou bipe a posição.', 'error'); return; }
+  if(!layoutIndex) await carregarLayoutIndex();
+  // Busca ignorando traços "-": reconhece a mesma posição informada com ou sem eles.
+  const reg = layoutIndex.get(normalizarPosicao(valor));
+  if(!reg){
+    const seguir = confirm('Posição "' + valor + '" não encontrada na base de Layout carregada.\n\nDeseja continuar mesmo assim?');
+    if(!seguir) return;
+  }
+  // Quando a posição é encontrada no Layout, usa o formato canônico já
+  // carregado (com os traços do jeito que está na base), independentemente de
+  // como o usuário bipou/digitou — evita ter a mesma posição salva de formas
+  // diferentes ("OFI-001-01" e "OFI00101") em contagens distintas.
+  const posicao = reg ? reg.posicao.toUpperCase() : valor.toUpperCase();
+
+  // verifica se já existe contagem finalizada para esta posição (aviso, não bloqueio)
+  const contagens = await dbGetAll('contagens');
+  const anterior = contagens.filter(c=> normalizarPosicao(c.posicao) === normalizarPosicao(posicao) && c.status==='finalizada')
+                             .sort((a,b)=> new Date(b.dataFim) - new Date(a.dataFim))[0];
+  if(anterior){
+    const recontagem = confirm('A posição "' + posicao + '" já foi contada por ' + anterior.usuarioNome + ' em ' + formatarDataHora(anterior.dataFim) + ' (quantidade: ' + calcularTotalBipado(anterior.itens) + ').\n\nDeseja realizar uma nova contagem (recontagem)?');
+    if(!recontagem) return;
+  }
+
+  contagemAtual = {
+    posicao: posicao,
+    layoutInfo: reg || null,
+    quantidadeInformada: null,
+    itens: [],
+    usuarioId: usuarioLogado.id,
+    usuarioNome: usuarioLogado.nome,
+    dataInicio: agora(),
+    status: 'em_andamento'
+  };
+
+  const infoTxt = reg
+    ? `<b>Empresa:</b> ${reg.empresa||'-'} &nbsp; | &nbsp; <b>Posição:</b> ${posicao} &nbsp; | &nbsp; <b>Status:</b> ${reg.status||'-'}`
+    : `<b>Posição:</b> ${posicao} &nbsp; <span class="badge pending">Não localizada no Layout</span>`;
+  document.getElementById('posInfoBox2').innerHTML = infoTxt;
+
+  document.getElementById('stepPosicao').classList.add('hidden');
+  document.getElementById('stepQuantidade').classList.remove('hidden');
+  mostrarEtapaIndicador(2, 'Quantidade');
+  setTimeout(()=> document.getElementById('inputQuantidade')?.focus(), 50);
+}
+
+function cancelarParaStep1(){
+  if(contagemAtual && contagemAtual.itens && contagemAtual.itens.length > 0){
+    const totalPerdido = calcularTotalBipado(contagemAtual.itens);
+    const confirmado = confirm(
+      'ATENÇÃO!\n\n' +
+      'Esta posição já possui ' + totalPerdido + ' unidade(s) bipada(s).\n\n' +
+      'Voltar para o início irá DESCARTAR todos os itens já bipados nesta posição.\n\n' +
+      'Se o problema é apenas a quantidade informada, use o botão "Corrigir Quantidade Informada" na etapa de bipagem em vez de voltar aqui.\n\n' +
+      'Deseja realmente descartar tudo e voltar ao início?'
+    );
+    if(!confirmado) return;
+  }
+  contagemAtual = null;
+  resetarFluxoContagem();
+}
+
+async function iniciarBipagem(){
+  const valorDigitado = document.getElementById('inputQuantidade').value;
+  if(valorDigitado === '' || valorDigitado === null){
+    mostrarToast('Informe a quantidade (digite 0 se a posição estiver vazia).', 'error'); return;
+  }
+  const qtd = parseInt(valorDigitado, 10);
+  if(isNaN(qtd) || qtd < 0){ mostrarToast('Informe uma quantidade válida (0 ou maior).', 'error'); return; }
+
+  // Quantidade zero = posição vazia. Exige confirmação explícita do usuário
+  // (evidência de que ele realmente passou pela posição e a encontrou vazia).
+  if(qtd === 0){
+    const jaTemItens = contagemAtual.itens && contagemAtual.itens.length > 0;
+    const confirmado = confirm(
+      (jaTemItens
+        ? 'ATENÇÃO!\n\nEsta posição já possui ' + calcularTotalBipado(contagemAtual.itens) + ' unidade(s) bipada(s). Confirmar como VAZIA irá DESCARTAR esses itens.\n\n'
+        : 'Confirmação de POSIÇÃO VAZIA\n\n') +
+      'Posição: ' + contagemAtual.posicao + '\n\n' +
+      'Você está confirmando que passou por esta posição e que ela NÃO possui nenhum item para contar (quantidade = 0).\n\n' +
+      'Este registro ficará vinculado ao seu usuário (' + usuarioLogado.nome + ') e ao horário atual.\n\n' +
+      'Deseja confirmar que a posição está vazia?'
+    );
+    if(!confirmado) return;
+
+    contagemAtual.quantidadeInformada = 0;
+    contagemAtual.itens = [];
+    contagemAtual.posicaoVazia = true;
+    contagemAtual.status = 'finalizada';
+    contagemAtual.dataFim = agora();
+    await dbPut('contagens', contagemAtual);
+    // Se esta posição fazia parte da lista de recontagem de divergências, marca como concluída.
+    await marcarRecontagemConcluidaSePendente(contagemAtual.posicao, 0);
+    mostrarToast('✔ Posição ' + contagemAtual.posicao + ' confirmada como VAZIA.', 'ok');
+    resetarFluxoContagem();
+    return;
+  }
+
+  // O processo de contagem (etapa de bipagem) só pode ser criado se o
+  // administrador já tiver definido qual dos dois modos especiais de bipagem
+  // é obrigatório. O contador não escolhe o modo — apenas segue o que foi
+  // estipulado pelo administrador (aba "Carregar Bases").
+  const modoObrigatorio = await obterModoBipagemObrigatorio();
+  if(!modoObrigatorio){
+    mostrarToast('O administrador ainda não configurou o modo de bipagem obrigatório (aba "Carregar Bases" → "Modo de Bipagem Obrigatório"). Não é possível iniciar a contagem até essa configuração ser feita.', 'error');
+    return;
+  }
+
+  contagemAtual.quantidadeInformada = qtd;
+  contagemAtual.posicaoVazia = false;
+
+  document.getElementById('posInfoBox3').innerHTML = document.getElementById('posInfoBox2').innerHTML;
+  document.getElementById('stepQuantidade').classList.add('hidden');
+  document.getElementById('stepBipagem').classList.remove('hidden');
+  mostrarEtapaIndicador(3, 'Bipagem');
+
+  atualizarContadoresBipagem();
+  renderizarTabelaItensBipados();
+  aplicarModoBipagemObrigatorio(modoObrigatorio);
+  limparCamposItem();
+  setTimeout(()=> document.getElementById('inputSku')?.focus(), 50);
+}
+
+function limparCamposItem(){
+  const travado = document.getElementById('chkTravarSerie').checked;
+  if(!travado){
+    document.getElementById('inputSku').value='';
+    document.getElementById('inputLote').value='';
+  }
+  document.getElementById('inputSerie').value='';
+  delete document.getElementById('inputSerie').dataset.serialCompleto;
+  document.getElementById('inputCampoLivre').value='';
+  document.getElementById('inputQtdLote').value='';
+  if(travado){
+    document.getElementById('inputSerie').focus();
+  } else {
+    document.getElementById('inputSku').focus();
+  }
+}
+
+// Ativa/desativa o modo "produto sem série": nesse modo o campo Série é
+// desabilitado e passa a existir um campo de quantidade total do lote,
+// permitindo lançar de uma vez todas as unidades de um SKU/Lote que não
+// possuem número de série individual para bipar unidade a unidade.
+function alternarModoSemSerie(){
+  const ativo = document.getElementById('chkSemSerie').checked;
+  const serieInput = document.getElementById('inputSerie');
+  const wrapQtd = document.getElementById('wrapQtdLote');
+
+  // Mutuamente exclusivo com o modo "travar por série"
+  if(ativo && document.getElementById('chkTravarSerie').checked){
+    document.getElementById('chkTravarSerie').checked = false;
+    alternarModoTravarSerie();
+  }
+
+  serieInput.value = '';
+  serieInput.disabled = ativo;
+  wrapQtd.classList.toggle('hidden', !ativo);
+  document.getElementById('chkTravarSerie').disabled = ativo;
+  if(ativo){
+    setTimeout(()=> document.getElementById('inputQtdLote')?.focus(), 30);
+  }
+}
+
+// Ativa/desativa o modo "bipar apenas por série": quando o usuário só precisa
+// contar pela série do produto, os campos SKU e Lote são desconsiderados —
+// ficam desabilitados e vazios — e apenas o campo Série permanece ativo para
+// uso, permitindo bipagem contínua (bipar → soma ao total → campo limpo e
+// focado de novo) sem depender de SKU/Lote.
+function alternarModoTravarSerie(){
+  const chk = document.getElementById('chkTravarSerie');
+  const skuInput = document.getElementById('inputSku');
+  const loteInput = document.getElementById('inputLote');
+  const serieInput = document.getElementById('inputSerie');
+  const aviso = document.getElementById('avisoTravarSerie');
+
+  if(chk.checked){
+    // Mutuamente exclusivo com o modo "sem série"
+    if(document.getElementById('chkSemSerie').checked){
+      document.getElementById('chkSemSerie').checked = false;
+      alternarModoSemSerie();
+    }
+    skuInput.value = '';
+    loteInput.value = '';
+    skuInput.disabled = true;
+    loteInput.disabled = true;
+    document.getElementById('chkSemSerie').disabled = true;
+    aviso.textContent = '🔒 SKU e Lote desconsiderados neste modo. Bipe apenas as séries — cada leitura é somada automaticamente.';
+    setTimeout(()=> serieInput.focus(), 30);
+  } else {
+    skuInput.disabled = false;
+    loteInput.disabled = false;
+    document.getElementById('chkSemSerie').disabled = false;
+    aviso.textContent = '';
+  }
+}
+
+// Enter no campo Série (digitação manual ou leitora física via teclado):
+// aplica a extração do serial pelo tamanho do código antes de seguir — no
+// modo travado, bipa direto (fluxo contínuo); fora dele, avança para o
+// Campo Livre como antes.
+function onEnterCampoSerie(){
+  const campo = document.getElementById('inputSerie');
+  // Guarda o código completo bipado (bruto, antes de qualquer extração) para
+  // uso exclusivo no relatório de extração — não é exibido na tela de bipagem.
+  campo.dataset.serialCompleto = campo.value.trim();
+  const ehGS1 = tentarDecompoGS1(campo.value);
+  if(!ehGS1){
+    // Antes de truncar o campo para exibir só o serial extraído, usa o
+    // código BRUTO (completo) para também extrair e preencher o Lote.
+    preencherLoteAutomaticoDaSerie(campo.value);
+    campo.value = extrairSerial(campo.value);
+  }
+  if(document.getElementById('chkTravarSerie').checked){
+    adicionarItemBipado();
+  } else {
+    document.getElementById('inputCampoLivre').focus();
+  }
+}
+
+// Chave única de um lançamento: para itens com série, a série individualiza
+// a unidade; para lançamentos "sem série" (quantidade em lote), a chave é
+// fixa por SKU+Lote, impedindo que o mesmo lote seja lançado em duplicidade.
+function chaveDeItem(it){
+  return it.semSerie
+    ? normalizar(it.sku) + '|' + normalizar(it.lote) + '|__LOTE_SEM_SERIE__'
+    : normalizar(it.sku) + '|' + normalizar(it.lote) + '|' + normalizar(it.serie);
+}
+
+function calcularTotalBipado(itens){
+  return itens.reduce((soma, it)=> soma + (it.quantidade || 1), 0);
+}
+
+function adicionarItemBipado(){
+  const semSerie = document.getElementById('chkSemSerie').checked;
+  const sku = document.getElementById('inputSku').value.trim();
+  const lote = document.getElementById('inputLote').value.trim();
+  const campoLivre = document.getElementById('inputCampoLivre').value.trim();
+
+  if(semSerie){
+    // Modo "quantidade do lote": SKU e Lote são obrigatórios para ativar esta função.
+    if(!sku || !lote){
+      mostrarToast('Para informar a quantidade do lote, o SKU e o Lote são obrigatórios.', 'error');
+      return;
+    }
+    const qtdLote = parseInt(document.getElementById('inputQtdLote').value, 10);
+    if(!qtdLote || qtdLote <= 0){
+      mostrarToast('Informe uma quantidade válida para o lote (maior que zero).', 'error');
+      return;
+    }
+    const novoItem = {sku, lote, serie:'', campoLivre, quantidade: qtdLote, semSerie: true,
+      usuarioId: usuarioLogado.id, usuarioNome: usuarioLogado.nome, timestamp: agora()};
+    const chave = chaveDeItem(novoItem);
+    const duplicado = contagemAtual.itens.find(it=> chaveDeItem(it) === chave);
+    if(duplicado){
+      mostrarToast('⚠ Este SKU/Lote já teve uma quantidade informada nesta posição! Remova o lançamento anterior para corrigir.', 'warn');
+      return;
+    }
+    contagemAtual.itens.push(novoItem);
+    atualizarContadoresBipagem();
+    renderizarTabelaItensBipados();
+    limparCamposItem();
+    mostrarToast('Quantidade do lote adicionada: ' + qtdLote + ' un. (' + calcularTotalBipado(contagemAtual.itens) + '/' + contagemAtual.quantidadeInformada + ')', 'ok');
+    return;
+  }
+
+  const serieInputEl = document.getElementById('inputSerie');
+  const serie = serieInputEl.value.trim();
+  if(!sku && !lote && !serie){
+    mostrarToast('Preencha ao menos o SKU, Lote ou Série para bipar o item.', 'error');
+    return;
+  }
+
+  // Código completo bipado (bruto, antes da extração do serial), guardado apenas
+  // para constar no relatório de extração — não aparece na tela de bipagem.
+  const serieCompleta = serieInputEl.dataset.serialCompleto || serie;
+
+  const novoItem = {sku, lote, serie, serieCompleta, campoLivre, quantidade: 1, semSerie: false,
+    usuarioId: usuarioLogado.id, usuarioNome: usuarioLogado.nome, timestamp: agora()};
+  const chave = chaveDeItem(novoItem);
+  const duplicado = contagemAtual.itens.find(it=> chaveDeItem(it) === chave);
+  if(duplicado){
+    mostrarToast('⚠ Produto já contabilizado nesta posição! Bipagem duplicada não foi registrada.', 'warn');
+    limparCamposItem();
+    return;
+  }
+
+  contagemAtual.itens.push(novoItem);
+  atualizarContadoresBipagem();
+  renderizarTabelaItensBipados();
+  limparCamposItem();
+  mostrarToast('Item adicionado (' + calcularTotalBipado(contagemAtual.itens) + '/' + contagemAtual.quantidadeInformada + ')', 'ok');
+}
+
+function removerItemBipado(idx){
+  if(!confirm('Remover este item da contagem?')) return;
+  contagemAtual.itens.splice(idx, 1);
+  atualizarContadoresBipagem();
+  renderizarTabelaItensBipados();
+}
+
+function atualizarContadoresBipagem(){
+  const bip = calcularTotalBipado(contagemAtual.itens);
+  const inf = contagemAtual.quantidadeInformada;
+  document.getElementById('sumBipados').textContent = bip;
+  document.getElementById('sumInformado').textContent = inf;
+  document.getElementById('sumFaltam').textContent = Math.max(inf - bip, 0);
+}
+
+function renderizarTabelaItensBipados(){
+  const tbody = document.getElementById('tabelaItensBipados');
+  tbody.innerHTML = '';
+  contagemAtual.itens.forEach((it, idx)=>{
+    const tr = document.createElement('tr');
+    if(idx === contagemAtual.itens.length - 1) tr.className = 'item-row-new';
+    const serieTxt = it.semSerie ? '<span class="tag-free">sem série</span>' : (it.serie||'-');
+    tr.innerHTML = `<td>${idx+1}</td><td>${it.sku||'-'}</td><td>${it.lote||'-'}</td><td>${serieTxt}</td><td>${it.quantidade||1}</td><td>${it.campoLivre||'-'}</td><td>${new Date(it.timestamp).toLocaleTimeString('pt-BR')}</td>
+      <td><button class="btn danger small" onclick="removerItemBipado(${idx})">Remover</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function confirmarConclusaoContagem(){
+  const bip = calcularTotalBipado(contagemAtual.itens);
+  const inf = contagemAtual.quantidadeInformada;
+  if(bip !== inf){
+    mostrarToast(`Divergência: quantidade informada (${inf}) é diferente da quantidade bipada (${bip}). Confira os itens antes de finalizar.`, 'error');
+    alert('A posição não pode ser finalizada.\n\nQuantidade informada: ' + inf + '\nQuantidade bipada: ' + bip + '\n\nRevise a bipagem (itens faltando, sobrando ou duplicados) antes de confirmar novamente.');
+    return;
+  }
+
+  contagemAtual.status = 'finalizada';
+  contagemAtual.dataFim = agora();
+  await dbPut('contagens', contagemAtual);
+  // Se esta posição fazia parte da lista de recontagem de divergências, marca como concluída.
+  await marcarRecontagemConcluidaSePendente(contagemAtual.posicao, bip);
+  mostrarToast('✔ Posição ' + contagemAtual.posicao + ' finalizada com sucesso!', 'ok');
+  alert('Contagem da posição ' + contagemAtual.posicao + ' finalizada com sucesso.\nIniciando nova contagem.');
+  resetarFluxoContagem();
+}
+
+function cancelarContagemAtual(){
+  if(!confirm('Cancelar esta contagem? Os itens bipados nesta posição serão descartados (não finalizados).')) return;
+  contagemAtual = null;
+  resetarFluxoContagem();
+}
+
+// Permite corrigir a quantidade informada no início da contagem (caso tenha
+// sido digitada errada), retornando à etapa de quantidade SEM descartar os
+// itens já bipados nesta posição. Exige um alerta de atenção antes de agir,
+// para não ser usado por engano no lugar de "Cancelar Contagem".
+function corrigirQuantidadeInformada(){
+  const totalBipadoAtual = calcularTotalBipado(contagemAtual.itens);
+  const confirmado = confirm(
+    '⚠ ATENÇÃO!\n\n' +
+    'Você está prestes a corrigir a QUANTIDADE INFORMADA para a posição ' + contagemAtual.posicao + '.\n\n' +
+    'Quantidade informada atualmente: ' + contagemAtual.quantidadeInformada + '\n' +
+    'Itens já bipados nesta posição: ' + totalBipadoAtual + ' (serão mantidos, nada será perdido)\n\n' +
+    'Use esta opção somente se a quantidade digitada no início estiver ERRADA.\n\n' +
+    'Deseja continuar e corrigir a quantidade agora?'
+  );
+  if(!confirmado) return;
+
+  document.getElementById('stepBipagem').classList.add('hidden');
+  document.getElementById('stepQuantidade').classList.remove('hidden');
+  mostrarEtapaIndicador(2, 'Quantidade');
+
+  const campoQtd = document.getElementById('inputQuantidade');
+  campoQtd.value = contagemAtual.quantidadeInformada;
+  setTimeout(()=>{ campoQtd.focus(); campoQtd.select(); }, 50);
+  mostrarToast('Corrija a quantidade e clique em "Iniciar Bipagem" para voltar à contagem.', 'info');
+}
+
+/* =========================================================================
+   CADASTRO DE USUÁRIOS (ADMIN)
+   ========================================================================= */
+function toggleUsrPermReport(){
+  const perfil = document.getElementById('usrPerfil').value;
+  document.getElementById('usrPermReportWrap').style.display = (perfil === 'admin') ? 'none' : 'block';
+}
+
+async function salvarUsuario(){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode alterar cadastros.', 'error'); return; }
+  const nome = document.getElementById('usrNome').value.trim();
+  const login = document.getElementById('usrLogin').value.trim();
+  const senha = document.getElementById('usrSenha').value;
+  const perfil = document.getElementById('usrPerfil').value;
+  const podeRelatorio = document.getElementById('usrPermRelatorio').checked;
+  const editId = document.getElementById('usrEditId').value;
+
+  if(!nome || !login){ mostrarToast('Informe nome e login.', 'error'); return; }
+
+  const usuarios = await dbGetAll('usuarios');
+  const conflito = usuarios.find(u=> normalizar(u.login) === normalizar(login) && String(u.id) !== String(editId));
+  if(conflito){ mostrarToast('Já existe um usuário com este login.', 'error'); return; }
+
+  let registro;
+  if(editId){
+    registro = await dbGet('usuarios', parseInt(editId,10));
+    if(!registro){ mostrarToast('Usuário não encontrado.', 'error'); return; }
+    registro.nome = nome; registro.login = login; registro.perfil = perfil;
+    registro.podeExtrairRelatorio = (perfil==='admin') ? true : podeRelatorio;
+    if(senha){
+      if(senha.length < 4){ mostrarToast('A senha deve ter ao menos 4 caracteres.', 'error'); return; }
+      registro.senhaHash = await sha256(senha);
+    }
+  } else {
+    if(!senha || senha.length < 4){ mostrarToast('Informe uma senha com ao menos 4 caracteres.', 'error'); return; }
+    registro = {nome, login, senhaHash: await sha256(senha), perfil, podeExtrairRelatorio: (perfil==='admin')?true:podeRelatorio, ativo:true, criadoEm: agora()};
+  }
+  await dbPut('usuarios', registro);
+  mostrarToast('Usuário salvo com sucesso.', 'ok');
+  document.getElementById('usrNome').value=''; document.getElementById('usrLogin').value='';
+  document.getElementById('usrSenha').value=''; document.getElementById('usrEditId').value='';
+  document.getElementById('usrPerfil').value='contador'; document.getElementById('usrPermRelatorio').checked=false;
+  toggleUsrPermReport();
+  carregarTabelaUsuarios();
+}
+
+async function carregarTabelaUsuarios(){
+  const usuarios = await dbGetAll('usuarios');
+  const tbody = document.getElementById('tabelaUsuarios');
+  tbody.innerHTML = '';
+  usuarios.sort((a,b)=> a.nome.localeCompare(b.nome)).forEach(u=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${u.nome}</td><td>${u.login}</td>
+      <td><span class="badge ${u.perfil==='admin'?'admin':'info'}">${u.perfil==='admin'?'Administrador':'Contador'}</span></td>
+      <td>${u.podeExtrairRelatorio ? '<span class="badge ok">Sim</span>' : '<span class="badge pending">Não</span>'}</td>
+      <td>${u.ativo!==false ? '<span class="badge ok">Ativo</span>' : '<span class="badge error">Inativo</span>'}</td>
+      <td>
+        <button class="btn secondary small" onclick="editarUsuario(${u.id})">Editar</button>
+        <button class="btn ${u.ativo!==false?'danger':'success'} small" onclick="alternarAtivoUsuario(${u.id})">${u.ativo!==false?'Inativar':'Reativar'}</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function editarUsuario(id){
+  const u = await dbGet('usuarios', id);
+  if(!u) return;
+  document.getElementById('usrNome').value = u.nome;
+  document.getElementById('usrLogin').value = u.login;
+  document.getElementById('usrSenha').value = '';
+  document.getElementById('usrPerfil').value = u.perfil;
+  document.getElementById('usrPermRelatorio').checked = !!u.podeExtrairRelatorio;
+  document.getElementById('usrEditId').value = u.id;
+  toggleUsrPermReport();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+async function alternarAtivoUsuario(id){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode alterar cadastros.', 'error'); return; }
+  const usuarios = await dbGetAll('usuarios');
+  const u = usuarios.find(x=>x.id===id);
+  if(!u) return;
+  if(u.perfil==='admin' && u.ativo!==false){
+    const totalAdminsAtivos = usuarios.filter(x=> x.perfil==='admin' && x.ativo!==false).length;
+    if(totalAdminsAtivos <= 1){ mostrarToast('Não é possível inativar o único administrador ativo do sistema.', 'error'); return; }
+  }
+  u.ativo = (u.ativo===false) ? true : false;
+  await dbPut('usuarios', u);
+  carregarTabelaUsuarios();
+}
+
+// Gera e baixa uma planilha modelo com as colunas esperadas para o cadastro
+// de usuários em massa, já com um exemplo preenchido.
+function baixarModeloUsuarios(){
+  const modelo = [
+    {'Nome':'João da Silva', 'Login':'joao.silva', 'Senha':'1234', 'Perfil':'Contador', 'Permissão Relatório':'Não'},
+    {'Nome':'Maria Souza', 'Login':'maria.souza', 'Senha':'5678', 'Perfil':'Administrador', 'Permissão Relatório':'Sim'}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(modelo), 'Usuarios');
+  XLSX.writeFile(wb, 'modelo_importacao_usuarios.xlsx');
+}
+
+// Importa/atualiza usuários em massa a partir de uma planilha Excel. Cada linha
+// vira um usuário: se o Login já existir, o cadastro é atualizado (a senha só
+// é trocada se uma nova for informada na planilha); se o Login for novo, um
+// usuário é criado (exigindo senha com ao menos 4 caracteres nesse caso).
+async function importarUsuariosEmMassa(evt){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode importar usuários.', 'error'); evt.target.value=''; return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+
+  try{
+    const linhas = await lerArquivoExcel(file);
+    if(!linhas.length){
+      mostrarToast('Planilha vazia ou sem linhas reconhecidas.', 'error');
+      evt.target.value = '';
+      return;
+    }
+
+    const usuariosExistentes = await dbGetAll('usuarios');
+    let criados = 0, atualizados = 0, ignorados = 0;
+    const avisos = [];
+
+    for(let i=0; i<linhas.length; i++){
+      const linha = linhas[i];
+      const numLinha = i + 2; // +2 = cabeçalho + índice base 1
+      const nome = String(acharColuna(linha, 'Nome', 'Nome Completo') || '').trim();
+      const login = String(acharColuna(linha, 'Login', 'Usuario', 'Usuário') || '').trim();
+      const senha = String(acharColuna(linha, 'Senha', 'Senha Inicial') || '').trim();
+      const perfilBruto = normalizar(acharColuna(linha, 'Perfil', 'Perfil de Acesso') || 'contador');
+      const perfil = perfilBruto.includes('ADMIN') ? 'admin' : 'contador';
+      const permBruto = normalizar(acharColuna(linha, 'Permissao Relatorio', 'Permissão Relatório', 'Pode Extrair Relatorio', 'Relatorio') || '');
+      const podeExtrairRelatorio = (perfil === 'admin') || ['SIM','S','TRUE','1','X'].includes(permBruto);
+
+      if(!nome || !login){
+        ignorados++;
+        avisos.push('Linha ' + numLinha + ': Nome ou Login vazio — linha ignorada.');
+        continue;
+      }
+
+      const existente = usuariosExistentes.find(u=> normalizar(u.login) === normalizar(login));
+      if(existente){
+        existente.nome = nome;
+        existente.perfil = perfil;
+        existente.podeExtrairRelatorio = podeExtrairRelatorio;
+        if(senha){
+          if(senha.length < 4){
+            avisos.push('Linha ' + numLinha + ': senha informada para "' + login + '" tem menos de 4 caracteres — senha anterior mantida.');
+          } else {
+            existente.senhaHash = await sha256(senha);
+          }
+        }
+        await dbPut('usuarios', existente);
+        atualizados++;
+      } else {
+        if(!senha || senha.length < 4){
+          ignorados++;
+          avisos.push('Linha ' + numLinha + ': login "' + login + '" é novo e precisa de senha com ao menos 4 caracteres — linha ignorada.');
+          continue;
+        }
+        const novo = {nome, login, senhaHash: await sha256(senha), perfil, podeExtrairRelatorio, ativo:true, criadoEm: agora()};
+        await dbPut('usuarios', novo);
+        usuariosExistentes.push(novo);
+        criados++;
+      }
+    }
+
+    const resumoMsg = 'Importação concluída: ' + criados + ' criado(s), ' + atualizados + ' atualizado(s), ' + ignorados + ' ignorado(s).';
+    mostrarToast(resumoMsg, 'ok');
+    if(avisos.length){
+      alert(resumoMsg + '\n\nAvisos:\n' + avisos.join('\n'));
+    }
+    carregarTabelaUsuarios();
+  }catch(err){
+    mostrarToast('Erro ao importar planilha de usuários: ' + err.message, 'error');
+  }
+  evt.target.value = '';
+}
+
+/* =========================================================================
+   CARREGAMENTO DE BASES (LAYOUT E BASE DO SISTEMA) - ADMIN
+   ========================================================================= */
+function lerArquivoExcel(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:'array', cellDates:true});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        // raw:false força o SheetJS a devolver o texto exatamente como o Excel exibiria
+        // a célula (respeitando máscaras de formatação numérica, ex: "00" -> "01").
+        // Ainda assim colunas sem máscara alguma (formato "Geral") continuam vindo
+        // como número puro — por isso complementamos com normalizarCampoImportado()
+        // e com a reconstrução a partir da POSIÇÃO (sempre texto) logo abaixo.
+        const rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+        resolve(rows);
+      }catch(err){ reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function acharColuna(obj, ...nomesPossiveis){
+  const chaves = Object.keys(obj);
+  for(const nome of nomesPossiveis){
+    const achado = chaves.find(k=> normalizar(k).replace(/[?._-]/g,'') === normalizar(nome).replace(/[?._-]/g,''));
+    if(achado !== undefined) return obj[achado];
+  }
+  return '';
+}
+
+/* =========================================================================
+   NORMALIZAÇÃO DE CAMPOS IMPORTADOS
+   Objetivo: o sistema deve reconhecer POSIÇÃO / PREDIO / NIVEL / RUA / COL / NVL
+   independente de como a planilha de origem formatou a célula (texto, número,
+   número com zero à esquerda perdido, etc).
+   Estratégia:
+   1) Converte qualquer valor de célula para texto simples (sem notação
+      científica, sem ".0", sem hora/data indevida).
+   2) Sempre que a POSIÇÃO existir, ela é a fonte da verdade: como contém
+      letras/traços, o Excel nunca a converte para número, então os pedaços
+      RUA / PREDIO / NIVEL (ou RUA / COL / NVL) são extraídos diretamente dela.
+   3) Quando não é possível derivar da POSIÇÃO, aplica-se um "padding"
+      inteligente: a maior quantidade de dígitos observada em valores já
+      corretos da mesma coluna (ex: "001") é usada para completar com zeros
+      à esquerda os valores que vieram como número puro (ex: 1 -> "001").
+   ========================================================================= */
+function valorParaTextoBruto(valor){
+  if(valor === undefined || valor === null) return '';
+  if(valor instanceof Date){
+    return valor.toLocaleDateString('pt-BR');
+  }
+  if(typeof valor === 'number'){
+    return Number.isFinite(valor) ? String(valor) : '';
+  }
+  return String(valor).trim();
+}
+
+// Divide a POSIÇÃO em segmentos de texto (ex: "OFI-001-01" -> ["OFI","001","01"]).
+function extrairSegmentosPosicao(posicaoTexto){
+  if(!posicaoTexto) return [];
+  return String(posicaoTexto).split('-').map(s=> s.trim()).filter(s=> s.length>0);
+}
+
+// Observa os valores originais de uma coluna e descobre a maior largura (nº de
+// dígitos) entre os que já vieram corretamente como texto com zero à esquerda.
+function inferirLarguraColuna(valoresOriginais){
+  let largura = 0;
+  valoresOriginais.forEach(v=>{
+    const t = valorParaTextoBruto(v);
+    if(/^\d+$/.test(t) && t.length > String(parseInt(t,10)).length){
+      largura = Math.max(largura, t.length);
+    }
+  });
+  return largura;
+}
+
+// Aplica o padding descoberto acima em um valor específico, se necessário.
+function aplicarPaddingSeNecessario(valorOriginal, largura){
+  let texto = valorParaTextoBruto(valorOriginal);
+  if(largura > 0 && /^\d+$/.test(texto) && texto.length < largura){
+    texto = texto.padStart(largura, '0');
+  }
+  return texto;
+}
+
+// Converte texto numérico vindo de planilha (com vírgula decimal, separador de
+// milhar, ou já numérico) em Number, sem quebrar com formatos variados.
+function paraNumeroSeguro(valor){
+  if(typeof valor === 'number') return Number.isFinite(valor) ? valor : 0;
+  let s = String(valor===undefined||valor===null?'':valor).trim();
+  if(s === '') return 0;
+  s = s.replace(/[^\d,.\-]/g,'');
+  if(s.includes(',') && s.includes('.')){
+    s = s.replace(/\./g,'').replace(',', '.');
+  } else if(s.includes(',')){
+    s = s.replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/* Monta os campos RUA / PREDIO(ou COL) / NIVEL(ou NVL) de um conjunto de linhas
+   importadas, priorizando sempre a quebra da POSIÇÃO e caindo para as colunas
+   originais (com padding inteligente) apenas quando a POSIÇÃO não puder ser
+   dividida em 3 segmentos. Retorna um array paralelo ao de entrada. */
+function derivarSegmentosEstrutura(linhasComPosicao, chaveA, chaveB, chaveC){
+  const largA = inferirLarguraColuna(linhasComPosicao.map(l=> l[chaveA]));
+  const largB = inferirLarguraColuna(linhasComPosicao.map(l=> l[chaveB]));
+  const largC = inferirLarguraColuna(linhasComPosicao.map(l=> l[chaveC]));
+  return linhasComPosicao.map(l=>{
+    const segmentos = extrairSegmentosPosicao(l.__posicaoTexto);
+    if(segmentos.length === 3){
+      return { a: segmentos[0], b: segmentos[1], c: segmentos[2] };
+    }
+    return {
+      a: aplicarPaddingSeNecessario(l[chaveA], largA),
+      b: aplicarPaddingSeNecessario(l[chaveB], largB),
+      c: aplicarPaddingSeNecessario(l[chaveC], largC)
+    };
+  });
+}
+
+async function carregarLayout(evt){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode carregar bases.', 'error'); return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+  try{
+    const rows = await lerArquivoExcel(file);
+    const brutos = rows.map(r=>({
+      __posicaoTexto: valorParaTextoBruto(acharColuna(r,'POSIÇÃO','POSICAO')).trim().toUpperCase(),
+      empresa: valorParaTextoBruto(acharColuna(r,'EMPRESA')),
+      rua: acharColuna(r,'RUA'),
+      predio: acharColuna(r,'PREDIO','PRÉDIO'),
+      nivel: acharColuna(r,'NIVEL','NÍVEL'),
+      status: valorParaTextoBruto(acharColuna(r,'STATUS DA POSIÇÃO','STATUS'))
+    })).filter(r=> r.__posicaoTexto);
+
+    const segmentos = derivarSegmentosEstrutura(brutos, 'rua', 'predio', 'nivel');
+
+    const registros = brutos.map((r, idx)=>({
+      posicao: r.__posicaoTexto,
+      empresa: r.empresa,
+      rua: segmentos[idx].a,
+      predio: segmentos[idx].b,
+      nivel: segmentos[idx].c,
+      status: r.status
+    }));
+
+    await dbClear('layout');
+    await dbBulkPut('layout', registros);
+    await dbPut('config', {chave:'layoutAtualizadoEm', valor: agora()});
+    await carregarLayoutIndex();
+    mostrarToast(registros.length + ' posições de layout carregadas com sucesso.', 'ok');
+    atualizarPainelBases();
+  }catch(err){
+    mostrarToast('Erro ao ler o arquivo: ' + err.message, 'error');
+  }
+  evt.target.value = '';
+}
+
+async function limparLayout(){
+  if(!ehAdmin()) return;
+  if(!confirm('Tem certeza que deseja limpar toda a base de layout?')) return;
+  await dbClear('layout');
+  await dbPut('config', {chave:'layoutAtualizadoEm', valor:null});
+  await carregarLayoutIndex();
+  atualizarPainelBases();
+  mostrarToast('Base de layout limpa.', 'info');
+}
+
+async function carregarBaseSistema(evt){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode carregar bases.', 'error'); return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+  try{
+    const rows = await lerArquivoExcel(file);
+    const brutos = rows.map(r=>({
+      cia: valorParaTextoBruto(acharColuna(r,'CIA')),
+      sku: acharColuna(r,'SKU'),
+      status: valorParaTextoBruto(acharColuna(r,'STATUS')),
+      controlaLote: valorParaTextoBruto(acharColuna(r,'CONTROLA_LOTE?','CONTROLA_LOTE')),
+      lote: acharColuna(r,'LOTE'),
+      loteSts: valorParaTextoBruto(acharColuna(r,'LOTE_STS')),
+      comp: valorParaTextoBruto(acharColuna(r,'COMP')),
+      __posicaoTexto: valorParaTextoBruto(acharColuna(r,'POSIÇÃO','POSICAO')).trim().toUpperCase(),
+      rua: acharColuna(r,'RUA'),
+      col: acharColuna(r,'COL'),
+      nvl: acharColuna(r,'NVL'),
+      descricao: valorParaTextoBruto(acharColuna(r,'DESCRICAO','DESCRIÇÃO')),
+      validade: valorParaTextoBruto(acharColuna(r,'VALIDADE')),
+      livre: paraNumeroSeguro(acharColuna(r,'LIVRE')),
+      recebimento: paraNumeroSeguro(acharColuna(r,'RECEBIMENTO')),
+      transito: paraNumeroSeguro(acharColuna(r,'TRANSITO','TRÂNSITO')),
+      alocado: paraNumeroSeguro(acharColuna(r,'ALOCADO')),
+      categoria: valorParaTextoBruto(acharColuna(r,'CATEGORIA'))
+    })).filter(r=> r.__posicaoTexto);
+
+    const segmentos = derivarSegmentosEstrutura(brutos, 'rua', 'col', 'nvl');
+    const largSku = inferirLarguraColuna(brutos.map(r=> r.sku));
+    const largLote = inferirLarguraColuna(brutos.map(r=> r.lote));
+
+    const registros = brutos.map((r, idx)=>({
+      cia: r.cia,
+      sku: aplicarPaddingSeNecessario(r.sku, largSku),
+      status: r.status,
+      controlaLote: r.controlaLote,
+      lote: aplicarPaddingSeNecessario(r.lote, largLote),
+      loteSts: r.loteSts,
+      comp: r.comp,
+      posicao: r.__posicaoTexto,
+      rua: segmentos[idx].a,
+      col: segmentos[idx].b,
+      nvl: segmentos[idx].c,
+      descricao: r.descricao,
+      validade: r.validade,
+      livre: r.livre,
+      recebimento: r.recebimento,
+      transito: r.transito,
+      alocado: r.alocado,
+      categoria: r.categoria
+    }));
+
+    await dbClear('baseSistema');
+    await dbBulkPut('baseSistema', registros);
+    await dbPut('config', {chave:'baseSistemaAtualizadoEm', valor: agora()});
+    mostrarToast(registros.length + ' registros da base do sistema carregados com sucesso.', 'ok');
+    atualizarPainelBases();
+  }catch(err){
+    mostrarToast('Erro ao ler o arquivo: ' + err.message, 'error');
+  }
+  evt.target.value = '';
+}
+
+async function limparBaseSistema(){
+  if(!ehAdmin()) return;
+  if(!confirm('Tem certeza que deseja limpar toda a base do sistema?')) return;
+  await dbClear('baseSistema');
+  await dbPut('config', {chave:'baseSistemaAtualizadoEm', valor:null});
+  atualizarPainelBases();
+  mostrarToast('Base do sistema limpa.', 'info');
+}
+
+async function atualizarPainelBases(){
+  const layout = await dbGetAll('layout');
+  const baseSistema = await dbGetAll('baseSistema');
+  const cfgLayout = await dbGet('config', 'layoutAtualizadoEm');
+  const cfgBase = await dbGet('config', 'baseSistemaAtualizadoEm');
+  const elQtdLayout = document.getElementById('qtdLayout');
+  const elQtdBase = document.getElementById('qtdBaseSistema');
+  if(elQtdLayout) elQtdLayout.textContent = layout.length;
+  if(elQtdBase) elQtdBase.textContent = baseSistema.length;
+  const elDataLayout = document.getElementById('dataLayout');
+  const elDataBase = document.getElementById('dataBaseSistema');
+  if(elDataLayout) elDataLayout.textContent = (cfgLayout && cfgLayout.valor) ? formatarDataHora(cfgLayout.valor) : '-';
+  if(elDataBase) elDataBase.textContent = (cfgBase && cfgBase.valor) ? formatarDataHora(cfgBase.valor) : '-';
+
+  const selModo = document.getElementById('selModoBipagemObrigatorio');
+  const statusModo = document.getElementById('statusModoBipagemObrigatorio');
+  if(selModo){
+    const modoAtual = await obterModoBipagemObrigatorio();
+    selModo.value = modoAtual || '';
+    if(statusModo){
+      statusModo.textContent = modoAtual
+        ? '✔ Modo ativo: ' + (modoAtual === 'serie' ? 'Bipar apenas por Série' : 'Produto sem Série (quantidade em lote)') + '. Todos os contadores seguirão este modo automaticamente.'
+        : '⚠ Nenhum modo configurado. Enquanto isso, nenhum contador conseguirá iniciar a bipagem de uma posição.';
+    }
+  }
+}
+
+/* Modo de bipagem obrigatório (ADMIN): as duas funções especiais de bipagem
+   ("Bipar apenas por série" e "Produto sem série") deixam de ser uma escolha
+   livre do contador — o administrador master define, aqui, qual das duas vale
+   para todo o sistema, e o contador apenas segue o que foi estipulado. Sem
+   essa configuração, o sistema bloqueia a criação de qualquer processo de
+   contagem (ver iniciarBipagem()). */
+async function obterModoBipagemObrigatorio(){
+  const cfg = await dbGet('config', 'modoBipagemObrigatorio');
+  return (cfg && cfg.valor) ? cfg.valor : null;
+}
+
+async function salvarModoBipagemObrigatorio(){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode definir o modo de bipagem.', 'error'); return; }
+  const sel = document.getElementById('selModoBipagemObrigatorio');
+  const valor = sel.value || null;
+  await dbPut('config', {chave:'modoBipagemObrigatorio', valor});
+  if(valor){
+    mostrarToast('Modo de bipagem obrigatório definido: ' + (valor === 'serie' ? 'Bipar apenas por Série' : 'Produto sem Série') + '.', 'ok');
+  } else {
+    mostrarToast('Modo de bipagem obrigatório removido. Os contadores ficarão bloqueados até uma nova configuração.', 'info');
+  }
+  atualizarPainelBases();
+}
+
+// Aplica, na tela de bipagem, o modo definido pelo administrador — marcando o
+// checkbox correspondente e mantendo AMBOS desabilitados, de forma que o
+// contador não consiga trocar de modo durante a contagem.
+function aplicarModoBipagemObrigatorio(modo){
+  const chkSerie = document.getElementById('chkTravarSerie');
+  const chkSemSerie = document.getElementById('chkSemSerie');
+  if(modo === 'serie'){
+    chkSerie.checked = true;
+    alternarModoTravarSerie();
+  } else if(modo === 'semSerie'){
+    chkSemSerie.checked = true;
+    alternarModoSemSerie();
+  }
+  chkSerie.disabled = true;
+  chkSemSerie.disabled = true;
+}
+
+/* Limpeza de contagens (ADMIN) — apaga todo o histórico de contagens (finalizadas
+   e em andamento) para reiniciar um novo inventário, sem afetar Layout, Base do
+   Sistema ou usuários. Ação destrutiva: exige dupla confirmação, incluindo a
+   digitação da palavra CONFIRMAR, para evitar cliques acidentais. */
+async function limparContagens(){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode limpar as contagens.', 'error'); return; }
+  const contagens = await dbGetAll('contagens');
+  if(contagens.length === 0){ mostrarToast('Não há contagens registradas para limpar.', 'info'); return; }
+
+  const primeiraConfirmacao = confirm(
+    'ATENÇÃO: Limpeza de Contagens\n\n' +
+    'Esta ação irá apagar permanentemente TODAS as ' + contagens.length + ' contagens registradas (finalizadas e em andamento).\n\n' +
+    'O Layout, a Base do Sistema e os usuários cadastrados NÃO serão afetados.\n\n' +
+    'Recomenda-se exportar um backup (JSON) ou o relatório completo (Excel) antes de continuar.\n\n' +
+    'Deseja continuar?'
+  );
+  if(!primeiraConfirmacao) return;
+
+  // Segunda confirmação: exige a SENHA do administrador logado (não apenas uma
+  // palavra digitada), validada contra o hash gravado no cadastro dele.
+  const senhaDigitada = prompt('Para confirmar a limpeza definitiva das contagens, digite a SENHA do administrador logado (' + usuarioLogado.nome + '):');
+  if(senhaDigitada === null || senhaDigitada === ''){
+    mostrarToast('Limpeza cancelada.', 'info');
+    return;
+  }
+  const registroAdmin = await dbGet('usuarios', usuarioLogado.id);
+  const hashDigitado = await sha256(senhaDigitada);
+  if(!registroAdmin || hashDigitado !== registroAdmin.senhaHash){
+    mostrarToast('Senha incorreta. Limpeza cancelada.', 'error');
+    return;
+  }
+
+  await dbClear('contagens');
+  mostrarToast('Todas as contagens foram apagadas. Novo inventário pode ser iniciado.', 'ok');
+  if(contagemAtual){ contagemAtual = null; resetarFluxoContagem(); }
+  if(!document.getElementById('aba-relatorios').classList.contains('hidden')) atualizarPainelRelatorios();
+}
+
+/* =========================================================================
+   RECONTAGEM DAS POSIÇÕES DIVERGENTES (ADMIN)
+   Permite ao administrador, a partir da análise do confronto, gerar uma 2ª
+   contagem restrita apenas às posições que apresentaram divergência (qtd.
+   contada ≠ qtd. do sistema). A lista fica salva na store 'recontagem' e é
+   automaticamente marcada como concluída quando a posição é recontada.
+   ========================================================================= */
+async function gerarRecontagemDivergencias(){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode gerar a recontagem.', 'error'); return; }
+
+  const contagens = (await dbGetAll('contagens')).filter(c=> c.status==='finalizada');
+  const confronto = await montarConfrontoSistema(contagens);
+  const divergentes = confronto.filter(c=> c.statusConfronto === 'DIVERGENTE');
+
+  if(divergentes.length === 0){
+    mostrarToast('Nenhuma posição divergente encontrada no confronto atual.', 'info');
+    return;
+  }
+
+  const confirmado = confirm(
+    'Gerar Recontagem das Divergências\n\n' +
+    'Foram encontradas ' + divergentes.length + ' posição(ões) com divergência entre a quantidade contada e a quantidade do sistema.\n\n' +
+    'Isso irá SUBSTITUIR a lista de recontagem atual por estas posições, marcadas como pendentes.\n\n' +
+    'Deseja continuar?'
+  );
+  if(!confirmado) return;
+
+  const geradoEm = agora();
+  const registros = divergentes.map(c=> ({
+    posicao: c.posicao,
+    qtdSistemaAnterior: c.qtdSistema,
+    qtdContadaAnterior: c.qtdContada,
+    status: 'pendente',
+    qtdRecontada: null,
+    geradoEm,
+    geradoPor: usuarioLogado.nome,
+    concluidoEm: null,
+    concluidoPor: null
+  }));
+
+  await dbClear('recontagem');
+  await dbBulkPut('recontagem', registros);
+  mostrarToast(registros.length + ' posição(ões) adicionadas à lista de recontagem.', 'ok');
+  await atualizarPainelRecontagem();
+}
+
+async function limparRecontagem(){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode limpar a recontagem.', 'error'); return; }
+  const lista = await dbGetAll('recontagem');
+  if(lista.length === 0){ mostrarToast('A lista de recontagem já está vazia.', 'info'); return; }
+  if(!confirm('Tem certeza que deseja apagar a lista de recontagem (' + lista.length + ' posição(ões))? Isso não afeta as contagens já registradas.')) return;
+  await dbClear('recontagem');
+  mostrarToast('Lista de recontagem apagada.', 'info');
+  await atualizarPainelRecontagem();
+}
+
+// Atualiza o painel (aba Relatórios) e o indicador rápido na aba de Contagem.
+async function atualizarPainelRecontagem(){
+  const lista = await dbGetAll('recontagem');
+  lista.sort((a,b)=> a.posicao.localeCompare(b.posicao));
+
+  const elTotal = document.getElementById('reconTotal');
+  const elPend = document.getElementById('reconPendentes');
+  const elConc = document.getElementById('reconConcluidas');
+  const pendentes = lista.filter(r=> r.status === 'pendente');
+  const concluidas = lista.filter(r=> r.status === 'concluida');
+  if(elTotal) elTotal.textContent = lista.length;
+  if(elPend) elPend.textContent = pendentes.length;
+  if(elConc) elConc.textContent = concluidas.length;
+
+  const tbody = document.getElementById('tabelaRecontagem');
+  if(tbody){
+    tbody.innerHTML = '';
+    lista.forEach(r=>{
+      const tr = document.createElement('tr');
+      const statusBadge = r.status === 'concluida' ? '<span class="badge ok">Recontada</span>' : '<span class="badge pending">Pendente</span>';
+      tr.innerHTML = `<td>${r.posicao}</td><td>${r.qtdSistemaAnterior}</td><td>${r.qtdContadaAnterior}</td><td>${statusBadge}</td><td>${r.qtdRecontada===null||r.qtdRecontada===undefined?'-':r.qtdRecontada}</td><td>${formatarDataHora(r.geradoEm)}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  atualizarIndicadorRecontagemContagem(pendentes);
+}
+
+// Pequeno indicador na Etapa 1 (Posição), listando as posições pendentes de
+// recontagem como atalhos clicáveis — clicar preenche o campo Posição.
+function atualizarIndicadorRecontagemContagem(pendentes){
+  const box = document.getElementById('reconIndicadorBox');
+  if(!box) return;
+  if(!pendentes || pendentes.length === 0){
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    return;
+  }
+  box.classList.remove('hidden');
+  const chips = pendentes.map(r=> `<button type="button" class="btn secondary small" style="margin:2px;" onclick="document.getElementById('inputPosicao').value='${r.posicao}'; confirmarPosicao();">${r.posicao}</button>`).join('');
+  box.innerHTML = '<b>🔁 Recontagem pendente (' + pendentes.length + '):</b><br>' + chips;
+}
+
+// Se a posição finalizada agora fazia parte da lista de recontagem pendente,
+// marca automaticamente como concluída.
+async function marcarRecontagemConcluidaSePendente(posicao, qtdContadaNova){
+  // Busca ignorando traços "-": a posição pode ter sido gerada na lista de
+  // recontagem com um formato e recontada digitando/bipando com outro.
+  const chaveAlvo = normalizarPosicao(posicao);
+  const lista = await dbGetAll('recontagem');
+  const reg = lista.find(r=> normalizarPosicao(r.posicao) === chaveAlvo);
+  if(!reg || reg.status !== 'pendente') return;
+  reg.status = 'concluida';
+  reg.qtdRecontada = qtdContadaNova;
+  reg.concluidoEm = agora();
+  reg.concluidoPor = usuarioLogado ? usuarioLogado.nome : '-';
+  await dbPut('recontagem', reg);
+}
+
+/* =========================================================================
+   BACKUP / RESTAURAÇÃO (JSON) — para consolidar contagens de vários aparelhos
+   ========================================================================= */
+async function exportarBackupJSON(){
+  const dados = {
+    versao: 1,
+    exportadoEm: agora(),
+    usuarios: await dbGetAll('usuarios'),
+    layout: await dbGetAll('layout'),
+    baseSistema: await dbGetAll('baseSistema'),
+    contagens: await dbGetAll('contagens'),
+    recontagem: await dbGetAll('recontagem')
+  };
+  const blob = new Blob([JSON.stringify(dados)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'backup_contagem_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  mostrarToast('Backup exportado.', 'ok');
+}
+
+async function importarBackupJSON(evt){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode importar backups.', 'error'); return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+  try{
+    const texto = await file.text();
+    const dados = JSON.parse(texto);
+    if(!confirm('Importar backup irá mesclar as CONTAGENS deste arquivo com as contagens já existentes (sem duplicar por ID). Deseja continuar?')) return;
+
+    if(Array.isArray(dados.contagens)){
+      const existentes = await dbGetAll('contagens');
+      const idsExistentes = new Set(existentes.map(c=> c.posicao + '@' + c.dataInicio));
+      const novas = dados.contagens.filter(c=> !idsExistentes.has(c.posicao + '@' + c.dataInicio));
+      // remove o id para deixar o autoIncrement gerar um novo, evitando conflito entre bases
+      novas.forEach(c=> delete c.id);
+      await dbBulkPut('contagens', novas);
+      mostrarToast(novas.length + ' contagens importadas (mescladas).', 'ok');
+    }
+    if(Array.isArray(dados.recontagem) && dados.recontagem.length){
+      await dbBulkPut('recontagem', dados.recontagem);
+    }
+    atualizarPainelRelatorios();
+  }catch(err){
+    mostrarToast('Erro ao importar backup: ' + err.message, 'error');
+  }
+  evt.target.value = '';
+}
+
+/* =========================================================================
+   RELATÓRIOS E CONFRONTO
+   ========================================================================= */
+async function atualizarPainelRelatorios(){
+  if(!podeExtrairRelatorio()) return;
+  const todasContagens = await dbGetAll('contagens');
+  const contagens = todasContagens.filter(c=> c.status==='finalizada');
+  const layout = await dbGetAll('layout');
+  const elQtdContagens = document.getElementById('qtdContagensRegistradas');
+  if(elQtdContagens) elQtdContagens.textContent = todasContagens.length;
+
+  const totalItens = contagens.reduce((s,c)=> s + calcularTotalBipado(c.itens), 0);
+  document.getElementById('repTotalContagens').textContent = contagens.length;
+  document.getElementById('repTotalItens').textContent = totalItens;
+
+  const posicoesContadas = new Set(contagens.map(c=> normalizarPosicao(c.posicao)));
+  const pendentes = layout.filter(l=> !posicoesContadas.has(normalizarPosicao(l.posicao)));
+  document.getElementById('repPosPendentes').textContent = layout.length ? pendentes.length : '-';
+
+  const confronto = await montarConfrontoSistema(contagens);
+  const divergentes = confronto.filter(c=> c.statusConfronto === 'DIVERGENTE').length;
+  document.getElementById('repDivergentes').textContent = divergentes;
+
+  const tbody = document.getElementById('tabelaContagens');
+  tbody.innerHTML = '';
+  contagens.sort((a,b)=> new Date(b.dataFim) - new Date(a.dataFim)).forEach(c=>{
+    const tr = document.createElement('tr');
+    const totalBip = calcularTotalBipado(c.itens);
+    const statusTxt = c.posicaoVazia ? 'Vazia (confirmada)' : (totalBip===c.quantidadeInformada?'OK':'Divergente');
+    const statusCls = c.posicaoVazia ? 'info' : (totalBip===c.quantidadeInformada?'ok':'error');
+    tr.innerHTML = `<td>${c.posicao}</td><td>${c.usuarioNome}</td><td>${c.quantidadeInformada}</td><td>${totalBip}</td>
+      <td><span class="badge ${statusCls}">${statusTxt}</span></td>
+      <td>${formatarDataHora(c.dataInicio)}</td><td>${formatarDataHora(c.dataFim)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  await montarPainelProgresso();
+  await atualizarPainelRecontagem();
+}
+
+/* ---------- Painel de progresso Layout x Contagem (visualização direta, sem exportar Excel) ---------- */
+let progressoLayoutCache = []; // lista já calculada: {posicao, empresa, rua, predio, nivel, situacao, usuario, dataContagem}
+
+async function montarPainelProgresso(){
+  const layout = await dbGetAll('layout');
+  const contagens = (await dbGetAll('contagens')).filter(c=> c.status==='finalizada');
+
+  // pega a contagem finalizada mais recente por posição
+  const maisRecentePorPosicao = new Map();
+  contagens.forEach(c=>{
+    const k = normalizarPosicao(c.posicao);
+    const atual = maisRecentePorPosicao.get(k);
+    if(!atual || new Date(c.dataFim) > new Date(atual.dataFim)) maisRecentePorPosicao.set(k, c);
+  });
+
+  progressoLayoutCache = layout.map(l=>{
+    const k = normalizarPosicao(l.posicao);
+    const contagem = maisRecentePorPosicao.get(k);
+    return {
+      posicao: l.posicao,
+      empresa: l.empresa,
+      rua: l.rua,
+      predio: l.predio,
+      nivel: l.nivel,
+      situacao: contagem ? 'CONTADA' : 'PENDENTE',
+      usuario: contagem ? contagem.usuarioNome : '-',
+      dataContagem: contagem ? contagem.dataFim : null
+    };
+  }).sort((a,b)=> a.posicao.localeCompare(b.posicao));
+
+  const total = progressoLayoutCache.length;
+  const contadas = progressoLayoutCache.filter(p=> p.situacao==='CONTADA').length;
+  const pendentes = total - contadas;
+  const pct = total ? Math.round((contadas/total)*100) : 0;
+
+  document.getElementById('progTotalLayout').textContent = total;
+  document.getElementById('progContadas').textContent = contadas;
+  document.getElementById('progPendentes').textContent = pendentes;
+  document.getElementById('progPercentual').textContent = pct + '%';
+
+  renderizarTabelaProgresso();
+}
+
+function renderizarTabelaProgresso(){
+  const buscaEl = document.getElementById('progBusca');
+  const filtroEl = document.getElementById('progFiltroSituacao');
+  if(!buscaEl || !filtroEl) return;
+  const busca = normalizar(buscaEl.value);
+  const filtro = filtroEl.value;
+
+  let lista = progressoLayoutCache;
+  if(filtro !== 'TODAS') lista = lista.filter(p=> p.situacao === filtro);
+  if(busca){
+    lista = lista.filter(p=>
+      normalizar(p.posicao).includes(busca) ||
+      normalizar(p.rua).includes(busca) ||
+      normalizar(p.predio).includes(busca) ||
+      normalizar(p.empresa).includes(busca)
+    );
+  }
+
+  const tbody = document.getElementById('tabelaProgressoLayout');
+  tbody.innerHTML = '';
+  if(lista.length === 0){
+    tbody.innerHTML = '<tr><td colspan="8" class="muted center">Nenhuma posição carregada no Layout, ou nenhum resultado para o filtro/busca aplicados.</td></tr>';
+  } else {
+    lista.forEach(p=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.posicao}</td><td>${p.empresa||'-'}</td><td>${p.rua||'-'}</td><td>${p.predio||'-'}</td><td>${p.nivel||'-'}</td>
+        <td><span class="badge ${p.situacao==='CONTADA'?'ok':'pending'}">${p.situacao==='CONTADA'?'Contada':'Pendente'}</span></td>
+        <td>${p.usuario}</td><td>${p.dataContagem ? formatarDataHora(p.dataContagem) : '-'}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById('progRodape').textContent = `Exibindo ${lista.length} de ${progressoLayoutCache.length} posições do Layout.`;
+}
+
+/* Confronta o que foi contado (agregado por posição) com a base do sistema (LIVRE por posição) */
+async function montarConfrontoSistema(contagensFinalizadas){
+  const baseSistema = await dbGetAll('baseSistema');
+  const somaSistemaPorPosicao = new Map();
+  // Chave de agrupamento ignora traços "-" (mesma posição com ou sem eles);
+  // guarda também o texto original de exibição, priorizando o formato da base
+  // do sistema (a posição de estoque carregada).
+  const exibicaoPorPosicao = new Map();
+  baseSistema.forEach(r=>{
+    const k = normalizarPosicao(r.posicao);
+    somaSistemaPorPosicao.set(k, (somaSistemaPorPosicao.get(k)||0) + (Number(r.livre)||0));
+    if(!exibicaoPorPosicao.has(k)) exibicaoPorPosicao.set(k, r.posicao);
+  });
+
+  // agrupa contagens finalizadas por posição, usando a mais recente por posição
+  const maisRecentePorPosicao = new Map();
+  contagensFinalizadas.forEach(c=>{
+    const k = normalizarPosicao(c.posicao);
+    if(!exibicaoPorPosicao.has(k)) exibicaoPorPosicao.set(k, c.posicao);
+    const atual = maisRecentePorPosicao.get(k);
+    if(!atual || new Date(c.dataFim) > new Date(atual.dataFim)) maisRecentePorPosicao.set(k, c);
+  });
+
+  const resultado = [];
+  const todasPosicoes = new Set([...somaSistemaPorPosicao.keys(), ...maisRecentePorPosicao.keys()]);
+  todasPosicoes.forEach(pos=>{
+    const qtdSistema = somaSistemaPorPosicao.has(pos) ? somaSistemaPorPosicao.get(pos) : null;
+    const contagem = maisRecentePorPosicao.get(pos);
+    const qtdContada = contagem ? calcularTotalBipado(contagem.itens) : null;
+    let statusConfronto;
+    if(qtdContada === null) statusConfronto = 'NAO_CONTADO';
+    else if(qtdSistema === null) statusConfronto = 'SEM_REGISTRO_SISTEMA';
+    else if(qtdSistema === qtdContada) statusConfronto = 'OK';
+    else statusConfronto = 'DIVERGENTE';
+    resultado.push({
+      posicao: exibicaoPorPosicao.get(pos) || pos,
+      qtdSistema: qtdSistema,
+      qtdContada: qtdContada,
+      diferenca: (qtdSistema!==null && qtdContada!==null) ? (qtdContada - qtdSistema) : null,
+      statusConfronto,
+      usuario: contagem ? contagem.usuarioNome : '-',
+      dataContagem: contagem ? contagem.dataFim : null
+    });
+  });
+  return resultado.sort((a,b)=> a.posicao.localeCompare(b.posicao));
+}
+
+/* Confronto detalhado do relatório: cruza SKU + LOTE + POSIÇÃO + QUANTIDADE
+   entre o que está registrado na base de posição de estoque carregada (coluna
+   LIVRE) e o que foi contado. A base é sempre o ponto de partida — cada linha
+   dela mantém seu SKU e Lote visíveis, nunca é resumida/escondida. Uma linha
+   "SÉRIE (bipagem sem SKU/Lote)" só aparece quando o usuário realmente contou
+   algum item usando o modelo de bipagem apenas por série (que dispensa SKU e
+   Lote); ela é um complemento informativo, nunca substitui as linhas da base. */
+async function montarConfrontoDetalhado(contagensFinalizadas){
+  // O confronto é sempre ancorado na base do sistema (o relatório de posição de
+  // estoque carregado): toda linha nasce de um SKU+LOTE+POSIÇÃO ali registrado,
+  // preservando sempre o SKU e o Lote — nunca "resumindo" ou escondendo essa
+  // informação. A quantidade contada é obtida cruzando com os itens bipados que
+  // também têm SKU/Lote preenchidos (bipagem normal por série ou bipagem "sem
+  // série" em lote, que exige SKU+Lote).
+  const baseSistema = await dbGetAll('baseSistema');
+
+  // Chave de posição ignora traços "-" (mesma posição com ou sem eles); guarda
+  // também o texto original de exibição, priorizando o formato da base do
+  // sistema (a posição de estoque carregada).
+  const exibicaoPorPosicao = new Map();
+  const sistemaPorSkuLotePos = new Map();
+  baseSistema.forEach(r=>{
+    const sku = normalizar(r.sku), lote = normalizar(r.lote), posicao = normalizarPosicao(r.posicao);
+    if(!sku || !posicao) return;
+    if(!exibicaoPorPosicao.has(posicao)) exibicaoPorPosicao.set(posicao, r.posicao);
+    const chaveSLP = sku+'|'+lote+'|'+posicao;
+    sistemaPorSkuLotePos.set(chaveSLP, (sistemaPorSkuLotePos.get(chaveSLP)||0) + (Number(r.livre)||0));
+  });
+
+  // Última contagem finalizada de cada posição (mesma regra do confronto por posição).
+  const maisRecentePorPosicao = new Map();
+  contagensFinalizadas.forEach(c=>{
+    const k = normalizarPosicao(c.posicao);
+    if(!exibicaoPorPosicao.has(k)) exibicaoPorPosicao.set(k, c.posicao);
+    const atual = maisRecentePorPosicao.get(k);
+    if(!atual || new Date(c.dataFim) > new Date(atual.dataFim)) maisRecentePorPosicao.set(k, c);
+  });
+
+  // Itens bipados COM SKU informado (bipagem normal, com ou sem série, e a
+  // bipagem "sem série" em lote — todas essas exigem SKU+Lote preenchidos) —
+  // são cruzadas diretamente com a base por SKU+LOTE+POSIÇÃO.
+  const contadoPorSkuLotePos = new Map();
+  // Itens bipados SOMENTE PELA SÉRIE (modo "travar por série", onde SKU e Lote
+  // ficam desconsiderados/vazios por definição) — como não têm SKU, não dá
+  // para cruzar com uma linha específica da base. Viram uma linha informativa
+  // à parte, por posição, e SÓ aparecem quando esse modo foi realmente usado.
+  const contadoSerieSemSkuPorPos = new Map();
+  maisRecentePorPosicao.forEach((c, posKey)=>{
+    (c.itens||[]).forEach(it=>{
+      const qtd = it.quantidade || 1;
+      const sku = normalizar(it.sku), lote = normalizar(it.lote);
+      if(!sku){
+        contadoSerieSemSkuPorPos.set(posKey, (contadoSerieSemSkuPorPos.get(posKey)||0) + qtd);
+        return;
+      }
+      const chaveSLP = sku+'|'+lote+'|'+posKey;
+      contadoPorSkuLotePos.set(chaveSLP, (contadoPorSkuLotePos.get(chaveSLP)||0) + qtd);
+    });
+  });
+
+  // A posição só fica "NÃO CONTADO" (em aberto) quando a POSIÇÃO INTEIRA nunca
+  // foi finalizada. Se a posição já foi contada, mas um SKU/lote registrado na
+  // base do sistema não apareceu entre os itens bipados, isso não é "ainda não
+  // contado" — é uma divergência real (o contador esteve lá e não encontrou
+  // aquele item), então a quantidade contada para ele é 0, não nula.
+  function obterQtdContada(mapaContado, chave, posicao){
+    if(mapaContado.has(chave)) return mapaContado.get(chave);
+    return maisRecentePorPosicao.has(posicao) ? 0 : null;
+  }
+
+  function montarLinha(tipoControle, sku, lote, posicaoChave, qtdSistema, qtdContada, statusForcado){
+    let statusConfronto = statusForcado;
+    if(!statusConfronto){
+      if(qtdContada === null) statusConfronto = 'NAO_CONTADO';
+      else if(qtdSistema === null) statusConfronto = 'SEM_REGISTRO_SISTEMA';
+      else if(qtdSistema === qtdContada) statusConfronto = 'OK';
+      else statusConfronto = 'DIVERGENTE';
+    }
+    const contagem = maisRecentePorPosicao.get(posicaoChave);
+    return {
+      tipoControle, sku, lote,
+      posicao: exibicaoPorPosicao.get(posicaoChave) || posicaoChave,
+      qtdSistema, qtdContada,
+      diferenca: (qtdSistema!==null && qtdContada!==null) ? (qtdContada - qtdSistema) : null,
+      statusConfronto,
+      usuario: contagem ? contagem.usuarioNome : '-',
+      dataContagem: contagem ? contagem.dataFim : null
+    };
+  }
+
+  const resultado = [];
+
+  // --- Toda linha da base do sistema (posição de estoque carregada), sempre com
+  // SKU + LOTE + POSIÇÃO visíveis, cruzada com o que foi bipado para esse mesmo
+  // SKU+LOTE+POSIÇÃO. Inclui também SKU+LOTE que foram bipados mas não existem
+  // na base (SEM REGISTRO NO SISTEMA). ---
+  const chaves = new Set([...sistemaPorSkuLotePos.keys(), ...contadoPorSkuLotePos.keys()]);
+  chaves.forEach(chave=>{
+    const [sku, lote, posicao] = chave.split('|');
+    resultado.push(montarLinha('BASE', sku, lote, posicao,
+      sistemaPorSkuLotePos.has(chave) ? sistemaPorSkuLotePos.get(chave) : null,
+      obterQtdContada(contadoPorSkuLotePos, chave, posicao)));
+  });
+
+  // --- Linha informativa extra: só aparece nas posições onde o usuário de fato
+  // bipou pelo modelo "somente série" (sem informar SKU/Lote). Não substitui as
+  // linhas da base acima — é um complemento, já que essa quantidade não pode
+  // ser atribuída a um SKU/Lote específico da base. ---
+  contadoSerieSemSkuPorPos.forEach((qtdContada, posicao)=>{
+    resultado.push(montarLinha('SÉRIE (bipagem sem SKU/Lote)', '(bipagem por série)', '-', posicao,
+      null, qtdContada, 'INFORMATIVO'));
+  });
+
+  return resultado.sort((a,b)=> (a.posicao+'|'+a.sku+'|'+a.lote).localeCompare(b.posicao+'|'+b.sku+'|'+b.lote));
+}
+
+async function exportarRelatorioCompleto(){
+  if(!podeExtrairRelatorio()){ mostrarToast('Você não tem permissão para extrair relatórios.', 'error'); return; }
+
+  const contagens = await dbGetAll('contagens');
+  const finalizadas = contagens.filter(c=> c.status==='finalizada');
+  const layout = await dbGetAll('layout');
+
+  // Sheet 1: Detalhe de itens bipados
+  const detalhe = [];
+  finalizadas.forEach(c=>{
+    c.itens.forEach((it, idx)=>{
+      detalhe.push({
+        'Posição': c.posicao,
+        'Item #': idx+1,
+        'SKU': it.sku,
+        'Lote': it.lote,
+        'Série': it.semSerie ? 'SEM SÉRIE (qtd. em lote)' : it.serie,
+        'Serial Completo (Código Bipado)': it.semSerie ? '' : (it.serieCompleta || it.serie || ''),
+        'Quantidade': it.quantidade || 1,
+        'Campo Livre': it.campoLivre,
+        'Usuário': it.usuarioNome,
+        'Data/Hora Bipagem': formatarDataHora(it.timestamp)
+      });
+    });
+  });
+
+  // Sheet 2: Resumo por posição contada
+  const resumo = finalizadas.map(c=>{
+    const totalBip = calcularTotalBipado(c.itens);
+    return {
+      'Posição': c.posicao,
+      'Usuário': c.usuarioNome,
+      'Quantidade Informada': c.quantidadeInformada,
+      'Quantidade Bipada': totalBip,
+      'Status': c.posicaoVazia ? 'VAZIA (CONFIRMADA)' : (c.quantidadeInformada===totalBip ? 'OK' : 'DIVERGENTE'),
+      'Início': formatarDataHora(c.dataInicio),
+      'Fim': formatarDataHora(c.dataFim)
+    };
+  });
+
+  // Sheet 3: Confronto com Layout (posições pendentes de contagem)
+  const posicoesContadas = new Set(finalizadas.map(c=> normalizarPosicao(c.posicao)));
+  const confrontoLayout = layout.map(l=>({
+    'Posição': l.posicao,
+    'Empresa': l.empresa,
+    'Rua': l.rua,
+    'Prédio': l.predio,
+    'Nível': l.nivel,
+    'Status Posição': l.status,
+    'Situação Contagem': posicoesContadas.has(normalizarPosicao(l.posicao)) ? 'CONTADA' : 'PENDENTE'
+  })).sort((a,b)=> a['Situação Contagem'].localeCompare(b['Situação Contagem']));
+
+  // Sheet 4: Confronto com a base de posição de estoque carregada — sempre por
+  // SKU + LOTE + POSIÇÃO + QUANTIDADE (nunca resume/esconde SKU e Lote); a
+  // bipagem feita apenas por série (sem SKU/Lote) aparece como linha extra
+  // informativa, por posição, só quando esse modo foi realmente usado.
+  const confrontoDetalhado = await montarConfrontoDetalhado(finalizadas);
+  const confrontoSistemaFmt = confrontoDetalhado.map(c=>({
+    'SKU': c.sku,
+    'Lote': c.lote,
+    'Posição': c.posicao,
+    'Tipo de Controle': c.tipoControle,
+    'Qtd. Sistema (LIVRE)': c.qtdSistema,
+    'Qtd. Contada': c.qtdContada,
+    'Diferença': c.diferenca,
+    'Status': ({'OK':'OK','DIVERGENTE':'DIVERGENTE','NAO_CONTADO':'NÃO CONTADO','SEM_REGISTRO_SISTEMA':'SEM REGISTRO NO SISTEMA','INFORMATIVO':'INFORMATIVO'})[c.statusConfronto],
+    'Usuário': c.usuario,
+    'Data Contagem': c.dataContagem ? formatarDataHora(c.dataContagem) : '-'
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumo), 'Resumo por Posição');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalhe), 'Detalhe dos Itens');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(confrontoLayout), 'Confronto Layout');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(confrontoSistemaFmt), 'Confronto Sistema');
+
+  const nomeArquivo = 'relatorio_contagem_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.xlsx';
+  XLSX.writeFile(wb, nomeArquivo);
+  mostrarToast('Relatório exportado: ' + nomeArquivo, 'ok');
+}
+</script>
+</body>
+</html>
