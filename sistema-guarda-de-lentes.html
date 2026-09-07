@@ -94,6 +94,28 @@
   .logo-upload-area .url-input{flex:1; min-width:200px; padding:6px 10px; border:1px solid var(--border); border-radius:4px; font-size:0.85rem;}
   #qr-reader-container{width:100%; max-width:400px; margin:10px auto; display:none;}
   #qr-reader-container video{width:100%; border-radius:8px;}
+
+  /* ===== LOGIN / USUÁRIOS (mesma estrutura usada nos outros sistemas) ===== */
+  .login-wrap{min-height:80vh; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .login-card{background:#fff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.15); padding:34px 38px; width:100%; max-width:400px;}
+  .login-card h2{text-align:center; color:var(--navy); border:none; margin-bottom:18px; font-size:1.25rem;}
+  .login-card .field{margin-bottom:14px;}
+  .login-card .field label{display:block; font-size:0.85rem; font-weight:700; color:#374151; margin-bottom:5px;}
+  .login-card .field input{width:100%; padding:11px 13px; border:1.5px solid var(--border); border-radius:7px; font-size:0.95rem;}
+  .login-card .field input:focus{outline:2px solid #9fc4ea; border-color:var(--navy);}
+  .login-card .btn{width:100%; margin-top:8px; justify-content:center;}
+  .login-card .center{text-align:center;}
+  .login-card .muted{color:#888; font-size:0.85rem;}
+  .hidden{display:none !important;}
+
+  .user-badge{font-size:0.78rem; color:rgba(255,255,255,0.9); display:flex; align-items:center; gap:8px;}
+  .user-badge .badge-perfil{background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.35); padding:2px 8px; border-radius:999px; font-size:0.7rem;}
+  .user-badge button{background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.4); padding:4px 10px; border-radius:6px; cursor:pointer; font-size:0.75rem;}
+
+  #tab-usuarios table.hist th, #tab-usuarios table.hist td{font-size:0.85rem;}
+  #tab-usuarios .status-ativo{color:var(--green); font-weight:700;}
+  #tab-usuarios .status-inativo{color:var(--red); font-weight:700;}
+
   @page{ size: landscape; margin: 8mm; }
   @media print{
     body{background:#fff;}
@@ -110,13 +132,76 @@
 
 <header>
   <h1>🔍 Guarda de Lentes — Sistema de Consulta</h1>
-  <nav class="no-print">
-    <button id="tabBtnConsulta" class="active" onclick="mostrarAba('consulta')">Consulta de Posição</button>
-    <button id="tabBtnFm" onclick="mostrarAba('fm')">FM-EMB23 (Impressão)</button>
+  <nav class="no-print" id="mainNav">
+    <button data-aba="consulta" id="tabBtnConsulta" class="active" onclick="mostrarAba('consulta')">Consulta de Posição</button>
+    <button data-aba="fm" id="tabBtnFm" onclick="mostrarAba('fm')">FM-EMB23 (Impressão)</button>
+    <button data-aba="usuarios" id="tabBtnUsuarios" class="hidden" onclick="mostrarAba('usuarios')">Usuários</button>
   </nav>
+  <div class="user-badge no-print" id="userBadge" style="display:none;">
+    <span>👤 <strong id="hdrNome">—</strong></span>
+    <span class="badge-perfil" id="hdrPerfil">—</span>
+    <button onclick="fazerLogout()">Sair</button>
+  </div>
 </header>
 
-<main>
+<!-- ===== PRIMEIRO ACESSO: CRIAR ADMINISTRADOR ===== -->
+<div id="setupScreen" class="hidden">
+  <div class="login-wrap">
+    <div class="login-card">
+      <h2>📦 Guarda de Lentes</h2>
+      <p class="muted center" style="margin-bottom:16px;">Primeiro acesso — crie a conta de administrador do sistema.</p>
+      <div class="field"><label>Nome</label><input type="text" id="setupNome" placeholder="Seu nome"></div>
+      <div class="field"><label>Login (usuário)</label><input type="text" id="setupLogin" placeholder="Ex: joao.silva"></div>
+      <div class="field"><label>Senha</label><input type="password" id="setupSenha" placeholder="Mínimo 4 caracteres"></div>
+      <div class="field"><label>Confirmar senha</label><input type="password" id="setupSenha2"></div>
+      <button class="btn" onclick="criarPrimeiroAdmin()">Criar Administrador</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LOGIN ===== -->
+<div id="loginScreen" class="hidden">
+  <div class="login-wrap">
+    <div class="login-card">
+      <h2>📦 Guarda de Lentes</h2>
+      <div class="field"><label>Login</label><input type="text" id="loginUser" placeholder="Usuário" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus();"></div>
+      <div class="field"><label>Senha</label><input type="password" id="loginPass" placeholder="Senha" onkeydown="if(event.key==='Enter')fazerLogin();"></div>
+      <button class="btn" onclick="fazerLogin()">Entrar</button>
+      <p class="muted center" style="margin-top:14px;">Acesso restrito. Procure o administrador para criar seu usuário.</p>
+      <p class="center" style="margin-top:6px;"><a href="#" onclick="event.preventDefault(); abrirRecuperarSenha();" style="font-size:0.85rem;">Administrador esqueceu a senha?</a></p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RECUPERAÇÃO DE SENHA (apenas contas ADMIN) ===== -->
+<div id="recuperarSenhaScreen" class="hidden">
+  <div class="login-wrap">
+    <div class="login-card">
+      <h2>🔑 Recuperar Senha do Administrador</h2>
+      <p class="muted center">Informe o login da conta de administrador para definir uma nova senha.</p>
+
+      <div id="recSenhaPasso1">
+        <div class="field"><label>Login do Administrador</label>
+          <input type="text" id="recLogin" placeholder="Usuário" onkeydown="if(event.key==='Enter'){event.preventDefault(); buscarAdminParaRecuperarSenha();}">
+        </div>
+        <button class="btn" onclick="buscarAdminParaRecuperarSenha()">Buscar</button>
+      </div>
+
+      <div id="recSenhaPasso2" class="hidden">
+        <p class="muted center" id="recSenhaConfirmandoTexto"></p>
+        <div class="field"><label>Nova Senha</label><input type="password" id="recNovaSenha" placeholder="Mínimo 4 caracteres"></div>
+        <div class="field"><label>Confirmar Nova Senha</label>
+          <input type="password" id="recNovaSenha2" onkeydown="if(event.key==='Enter'){event.preventDefault(); salvarNovaSenhaRecuperacao();}">
+        </div>
+        <button class="btn" onclick="salvarNovaSenhaRecuperacao()">Salvar Nova Senha</button>
+      </div>
+
+      <button class="btn secondary" style="margin-top:10px;" onclick="cancelarRecuperarSenha()">Voltar para o login</button>
+    </div>
+  </div>
+</div>
+
+<main id="appScreen" class="hidden">
 
   <section id="tab-consulta">
 
@@ -177,7 +262,7 @@
     <div class="card">
       <h2>Últimas leituras (sessão atual)</h2>
       <table class="hist">
-        <thead><tr><th>Hora</th><th>Código Lido</th><th>Serial</th><th>Posição</th><th>Status</th></tr></thead>
+        <thead><tr><th>Hora</th><th>Código Lido</th><th>Serial</th><th>Posição</th><th>Status</th><th>Usuário</th></tr></thead>
         <tbody id="histBody"></tbody>
       </table>
     </div>
@@ -292,6 +377,48 @@
     </div>
   </section>
 
+  <section id="tab-usuarios" style="display:none;">
+    <div class="card">
+      <h2>Cadastrar / editar usuário</h2>
+      <div class="input-group" style="flex-wrap:wrap;">
+        <input type="hidden" id="usrId">
+        <input type="text" id="usrNome" placeholder="Nome" style="flex:1; min-width:160px; padding:10px; border:1.5px solid var(--border); border-radius:6px;">
+        <input type="text" id="usrLogin" placeholder="Login (usuário)" style="flex:1; min-width:160px; padding:10px; border:1.5px solid var(--border); border-radius:6px;">
+        <input type="password" id="usrSenha" placeholder="Senha (deixe em branco para não alterar)" style="flex:1; min-width:200px; padding:10px; border:1.5px solid var(--border); border-radius:6px;">
+        <select id="usrPerfil" style="padding:10px; border:1.5px solid var(--border); border-radius:6px;">
+          <option value="operador">Operador</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </div>
+      <div class="toolbar" style="margin-top:12px;">
+        <button class="btn" onclick="salvarUsuario()">💾 Salvar Usuário</button>
+        <button class="btn secondary" onclick="limparFormularioUsuario()">Novo / Limpar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Cadastro em massa (CSV)</h2>
+      <div style="font-size:0.82rem; color:#555; margin-bottom:10px;">
+        Colunas esperadas: <strong>Nome;Login;Senha;Perfil</strong> (Perfil = Admin ou Operador). Logins já
+        existentes são atualizados (nome e perfil; a senha só é alterada se for informada na planilha);
+        logins novos são criados — nesse caso a senha é obrigatória, com pelo menos 4 caracteres.
+      </div>
+      <div class="toolbar">
+        <button class="btn secondary" onclick="baixarModeloUsuariosCSV()">⬇️ Baixar Modelo (CSV)</button>
+        <input type="file" id="fileUsuariosCSV" accept=".csv" style="display:none;" onchange="importarUsuariosCSV(event)">
+        <button class="btn" onclick="document.getElementById('fileUsuariosCSV').click()">📂 Importar Usuários (.csv)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Usuários cadastrados</h2>
+      <table class="hist">
+        <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody id="tabelaUsuarios"></tbody>
+      </table>
+    </div>
+  </section>
+
 </main>
 
 <script>
@@ -302,6 +429,404 @@
 // ATENÇÃO: Preencha com os dados do seu projeto Supabase
 const API_BASE_URL = 'https://dncthvkuyesuldysguvn.supabase.co/functions/v1/api'; // URL da Edge Function do Supabase (NAO é a URL do GitHub Pages!)
 const API_KEY = ''; // Opcional, se você definiu no server.js
+
+// =========================================================
+// LOGIN DE USUÁRIO (mesma estrutura usada nos outros sistemas: IndexedDB
+// + senha com hash SHA-256, sem backend/e-mail para confirmar identidade)
+// =========================================================
+async function sha256(texto){
+  const enc = new TextEncoder().encode(texto);
+  const hashBuf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function normalizarLogin(s){
+  return (s===undefined || s===null) ? '' : String(s).trim().toUpperCase();
+}
+
+let usuarioLogado = null; // {id, nome, login, perfil}
+
+function ehAdmin(){ return usuarioLogado && usuarioLogado.perfil === 'admin'; }
+
+function obterUsuarioAtual(){
+  return usuarioLogado ? usuarioLogado.nome : 'Não identificado';
+}
+
+async function salvarSessao(){
+  await salvarConfigLocal('sessaoUsuarioId', usuarioLogado ? usuarioLogado.id : null);
+}
+
+async function restaurarSessao(){
+  const idSalvo = await carregarConfigLocal('sessaoUsuarioId');
+  if(idSalvo){
+    const u = await dbGetUsuario(idSalvo);
+    if(u && u.ativo !== false){
+      usuarioLogado = {id:u.id, nome:u.nome, login:u.login, perfil:u.perfil};
+      return true;
+    }
+  }
+  return false;
+}
+
+async function verificarAcessoInicial(){
+  const usuarios = await dbGetAllUsuarios();
+  if(usuarios.length === 0){
+    document.getElementById('setupScreen').classList.remove('hidden');
+    return;
+  }
+  const restaurado = await restaurarSessao();
+  if(restaurado){
+    entrarNoApp();
+  }else{
+    document.getElementById('loginScreen').classList.remove('hidden');
+  }
+}
+
+/* ---------------- Primeiro acesso (cria o admin) ---------------- */
+async function criarPrimeiroAdmin(){
+  const nome = document.getElementById('setupNome').value.trim();
+  const login = document.getElementById('setupLogin').value.trim();
+  const senha = document.getElementById('setupSenha').value;
+  const senha2 = document.getElementById('setupSenha2').value;
+  if(!nome || !login || !senha){ alert('Preencha todos os campos.'); return; }
+  if(senha.length < 4){ alert('A senha deve ter ao menos 4 caracteres.'); return; }
+  if(senha !== senha2){ alert('As senhas não conferem.'); return; }
+
+  const senhaHash = await sha256(senha);
+  const id = await dbPutUsuario({nome, login, senhaHash, perfil:'admin', ativo:true, criadoEm: new Date().toISOString()});
+  usuarioLogado = {id, nome, login, perfil:'admin'};
+  await salvarSessao();
+  document.getElementById('setupScreen').classList.add('hidden');
+  entrarNoApp();
+}
+
+/* ---------------- Login / logout ---------------- */
+async function fazerLogin(){
+  const login = document.getElementById('loginUser').value.trim();
+  const senha = document.getElementById('loginPass').value;
+  if(!login || !senha){ alert('Informe login e senha.'); return; }
+
+  const usuarios = await dbGetAllUsuarios();
+  const u = usuarios.find(x => normalizarLogin(x.login) === normalizarLogin(login));
+  if(!u || u.ativo === false){ alert('Usuário não encontrado ou inativo.'); return; }
+
+  const senhaHash = await sha256(senha);
+  if(senhaHash !== u.senhaHash){ alert('Senha incorreta.'); return; }
+
+  usuarioLogado = {id:u.id, nome:u.nome, login:u.login, perfil:u.perfil};
+  await salvarSessao();
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  entrarNoApp();
+}
+
+async function fazerLogout(){
+  usuarioLogado = null;
+  await salvarSessao();
+  document.getElementById('appScreen').classList.add('hidden');
+  document.getElementById('userBadge').style.display = 'none';
+  document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+/* ---------------- Recuperação de senha (apenas contas ADMIN) ----------------
+   Sistema roda local, sem backend/e-mail para confirmar identidade — por isso
+   a recuperação fica restrita a contas com perfil ADMINISTRADOR. */
+let adminEmRecuperacao = null;
+
+function abrirRecuperarSenha(){
+  adminEmRecuperacao = null;
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('recSenhaPasso1').classList.remove('hidden');
+  document.getElementById('recSenhaPasso2').classList.add('hidden');
+  document.getElementById('recLogin').value = '';
+  document.getElementById('recNovaSenha').value = '';
+  document.getElementById('recNovaSenha2').value = '';
+  document.getElementById('recuperarSenhaScreen').classList.remove('hidden');
+  setTimeout(()=> document.getElementById('recLogin')?.focus(), 50);
+}
+
+function cancelarRecuperarSenha(){
+  adminEmRecuperacao = null;
+  document.getElementById('recuperarSenhaScreen').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+}
+
+async function buscarAdminParaRecuperarSenha(){
+  const login = document.getElementById('recLogin').value.trim();
+  if(!login){ alert('Informe o login do administrador.'); return; }
+  const usuarios = await dbGetAllUsuarios();
+  const u = usuarios.find(x => normalizarLogin(x.login) === normalizarLogin(login) && x.perfil === 'admin');
+  if(!u){ alert('Login não encontrado ou não é uma conta de administrador.'); return; }
+  if(u.ativo === false){ alert('Esta conta de administrador está inativa. Procure outro administrador ativo.'); return; }
+
+  adminEmRecuperacao = u;
+  document.getElementById('recSenhaConfirmandoTexto').textContent = 'Definindo nova senha para: ' + u.nome + ' (' + u.login + ')';
+  document.getElementById('recSenhaPasso1').classList.add('hidden');
+  document.getElementById('recSenhaPasso2').classList.remove('hidden');
+  setTimeout(()=> document.getElementById('recNovaSenha')?.focus(), 50);
+}
+
+async function salvarNovaSenhaRecuperacao(){
+  if(!adminEmRecuperacao){ alert('Busque o login novamente.'); return; }
+  const novaSenha = document.getElementById('recNovaSenha').value;
+  const novaSenha2 = document.getElementById('recNovaSenha2').value;
+  if(!novaSenha || novaSenha.length < 4){ alert('A nova senha deve ter ao menos 4 caracteres.'); return; }
+  if(novaSenha !== novaSenha2){ alert('As senhas não conferem.'); return; }
+
+  const registro = await dbGetUsuario(adminEmRecuperacao.id);
+  if(!registro){ alert('Usuário não encontrado (pode ter sido removido). Procure outro administrador.'); return; }
+  registro.senhaHash = await sha256(novaSenha);
+  await dbPutUsuario(registro);
+
+  const loginRecuperado = registro.login;
+  adminEmRecuperacao = null;
+  document.getElementById('recuperarSenhaScreen').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginUser').value = loginRecuperado;
+  document.getElementById('loginPass').value = '';
+  alert('Nova senha definida com sucesso! Faça login com a nova senha.');
+  setTimeout(()=> document.getElementById('loginPass')?.focus(), 50);
+}
+
+/* ---------------- Entrar no app / permissões ---------------- */
+function entrarNoApp(){
+  document.getElementById('hdrNome').textContent = usuarioLogado.nome;
+  const badge = document.getElementById('hdrPerfil');
+  badge.textContent = usuarioLogado.perfil === 'admin' ? 'Administrador' : 'Operador';
+  document.getElementById('userBadge').style.display = '';
+  document.getElementById('tabBtnUsuarios').classList.toggle('hidden', !ehAdmin());
+  document.getElementById('appScreen').classList.remove('hidden');
+  mostrarAba('consulta');
+}
+
+/* ---------------- Aba Usuários (gerenciamento, só admin) ---------------- */
+async function carregarTabelaUsuarios(){
+  const usuarios = await dbGetAllUsuarios();
+  const tbody = document.getElementById('tabelaUsuarios');
+  tbody.innerHTML = usuarios.map(u => (
+    '<tr>' +
+      '<td>'+u.nome+'</td>' +
+      '<td>'+u.login+'</td>' +
+      '<td>'+(u.perfil==='admin' ? 'Administrador' : 'Operador')+'</td>' +
+      '<td class="'+(u.ativo!==false ? 'status-ativo' : 'status-inativo')+'">'+(u.ativo!==false ? 'Ativo' : 'Inativo')+'</td>' +
+      '<td>' +
+        '<button class="btn secondary" style="padding:4px 10px; font-size:0.78rem;" onclick="editarUsuario('+u.id+')">Editar</button> ' +
+        '<button class="btn secondary" style="padding:4px 10px; font-size:0.78rem;" onclick="alternarAtivoUsuario('+u.id+')">'+(u.ativo!==false ? 'Desativar' : 'Ativar')+'</button> ' +
+        (u.id===usuarioLogado.id ? '' : '<button class="btn danger" style="padding:4px 10px; font-size:0.78rem;" onclick="removerUsuario('+u.id+')">Excluir</button>') +
+      '</td>' +
+    '</tr>'
+  )).join('');
+}
+
+function limparFormularioUsuario(){
+  document.getElementById('usrId').value = '';
+  document.getElementById('usrNome').value = '';
+  document.getElementById('usrLogin').value = '';
+  document.getElementById('usrSenha').value = '';
+  document.getElementById('usrPerfil').value = 'operador';
+}
+
+async function editarUsuario(id){
+  const u = await dbGetUsuario(id);
+  if(!u) return;
+  document.getElementById('usrId').value = u.id;
+  document.getElementById('usrNome').value = u.nome;
+  document.getElementById('usrLogin').value = u.login;
+  document.getElementById('usrSenha').value = '';
+  document.getElementById('usrPerfil').value = u.perfil;
+}
+
+async function salvarUsuario(){
+  const idStr = document.getElementById('usrId').value;
+  const nome = document.getElementById('usrNome').value.trim();
+  const login = document.getElementById('usrLogin').value.trim();
+  const senha = document.getElementById('usrSenha').value;
+  const perfil = document.getElementById('usrPerfil').value;
+
+  if(!nome || !login){ alert('Preencha nome e login.'); return; }
+
+  const usuarios = await dbGetAllUsuarios();
+  const idAtual = idStr ? parseInt(idStr, 10) : null;
+  const conflito = usuarios.find(u => normalizarLogin(u.login) === normalizarLogin(login) && u.id !== idAtual);
+  if(conflito){ alert('Já existe outro usuário com esse login.'); return; }
+
+  if(idAtual){
+    const registro = await dbGetUsuario(idAtual);
+    if(!registro){ alert('Usuário não encontrado.'); return; }
+    registro.nome = nome;
+    registro.login = login;
+    registro.perfil = perfil;
+    if(senha){
+      if(senha.length < 4){ alert('A senha deve ter ao menos 4 caracteres.'); return; }
+      registro.senhaHash = await sha256(senha);
+    }
+    await dbPutUsuario(registro);
+  }else{
+    if(!senha || senha.length < 4){ alert('Defina uma senha com ao menos 4 caracteres para o novo usuário.'); return; }
+    const senhaHash = await sha256(senha);
+    await dbPutUsuario({nome, login, senhaHash, perfil, ativo:true, criadoEm: new Date().toISOString()});
+  }
+
+  limparFormularioUsuario();
+  carregarTabelaUsuarios();
+}
+
+async function alternarAtivoUsuario(id){
+  const registro = await dbGetUsuario(id);
+  if(!registro) return;
+  registro.ativo = registro.ativo === false ? true : false;
+  await dbPutUsuario(registro);
+  carregarTabelaUsuarios();
+}
+
+async function removerUsuario(id){
+  if(!confirm('Tem certeza que deseja excluir este usuário? Essa ação não pode ser desfeita.')) return;
+  await dbDeleteUsuario(id);
+  carregarTabelaUsuarios();
+}
+
+/* ---------------- Cadastro em massa de usuários (CSV) ---------------- */
+function baixarModeloUsuariosCSV(){
+  const linhas = [
+    'Nome;Login;Senha;Perfil',
+    'João da Silva;joao.silva;1234;Operador',
+    'Maria Souza;maria.souza;5678;Administrador'
+  ];
+  const csv = '\uFEFF' + linhas.join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'modelo_importacao_usuarios.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Parser simples de CSV: aceita ";" ou "," como separador (detecta pelo
+// cabeçalho) e suporta campos entre aspas. Retorna um array de objetos,
+// usando a primeira linha como nomes das colunas.
+function parsearCSVUsuarios(texto){
+  const linhasBrutas = texto.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/).filter(l => l.trim() !== '');
+  if(linhasBrutas.length === 0) return [];
+
+  const separador = linhasBrutas[0].includes(';') ? ';' : ',';
+
+  function dividirLinha(linha){
+    const campos = [];
+    let atual = '';
+    let dentroAspas = false;
+    for(let i=0; i<linha.length; i++){
+      const c = linha[i];
+      if(c === '"'){
+        dentroAspas = !dentroAspas;
+      }else if(c === separador && !dentroAspas){
+        campos.push(atual);
+        atual = '';
+      }else{
+        atual += c;
+      }
+    }
+    campos.push(atual);
+    return campos.map(c => c.trim());
+  }
+
+  const cabecalho = dividirLinha(linhasBrutas[0]).map(c => c.trim());
+  const linhas = [];
+  for(let i=1; i<linhasBrutas.length; i++){
+    const campos = dividirLinha(linhasBrutas[i]);
+    const obj = {};
+    cabecalho.forEach((nomeCol, idx) => { obj[nomeCol] = campos[idx] !== undefined ? campos[idx] : ''; });
+    linhas.push(obj);
+  }
+  return linhas;
+}
+
+function acharColunaUsuario(linha, ...nomes){
+  for(const nome of nomes){
+    for(const chave in linha){
+      if(chave.trim().toLowerCase() === nome.trim().toLowerCase()) return linha[chave];
+    }
+  }
+  return '';
+}
+
+// Importa/atualiza usuários em massa a partir de um CSV. Cada linha vira um
+// usuário: se o Login já existir, o cadastro é atualizado (a senha só é
+// trocada se uma nova for informada); se o Login for novo, um usuário é
+// criado (exigindo senha com ao menos 4 caracteres nesse caso).
+async function importarUsuariosCSV(evt){
+  if(!ehAdmin()){ alert('Apenas o administrador pode importar usuários.'); evt.target.value=''; return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+
+  try{
+    const texto = await file.text();
+    const linhas = parsearCSVUsuarios(texto);
+    if(!linhas.length){
+      alert('Arquivo CSV vazio ou sem linhas reconhecidas.');
+      evt.target.value = '';
+      return;
+    }
+
+    const usuariosExistentes = await dbGetAllUsuarios();
+    let criados = 0, atualizados = 0, ignorados = 0;
+    const avisos = [];
+
+    for(let i=0; i<linhas.length; i++){
+      const linha = linhas[i];
+      const numLinha = i + 2; // +2 = cabeçalho + índice base 1
+      const nome = String(acharColunaUsuario(linha, 'Nome', 'Nome Completo') || '').trim();
+      const login = String(acharColunaUsuario(linha, 'Login', 'Usuario', 'Usuário') || '').trim();
+      const senha = String(acharColunaUsuario(linha, 'Senha', 'Senha Inicial') || '').trim();
+      const perfilBruto = normalizarLogin(acharColunaUsuario(linha, 'Perfil', 'Perfil de Acesso') || 'operador');
+      const perfil = perfilBruto.includes('ADMIN') ? 'admin' : 'operador';
+
+      if(!nome || !login){
+        ignorados++;
+        avisos.push('Linha ' + numLinha + ': Nome ou Login vazio — linha ignorada.');
+        continue;
+      }
+
+      const existente = usuariosExistentes.find(u => normalizarLogin(u.login) === normalizarLogin(login));
+      if(existente){
+        existente.nome = nome;
+        existente.perfil = perfil;
+        if(senha){
+          if(senha.length < 4){
+            avisos.push('Linha ' + numLinha + ': senha informada para "' + login + '" tem menos de 4 caracteres — senha anterior mantida.');
+          }else{
+            existente.senhaHash = await sha256(senha);
+          }
+        }
+        await dbPutUsuario(existente);
+        atualizados++;
+      }else{
+        if(!senha || senha.length < 4){
+          ignorados++;
+          avisos.push('Linha ' + numLinha + ': login "' + login + '" é novo e precisa de senha com ao menos 4 caracteres — linha ignorada.');
+          continue;
+        }
+        const novo = {nome, login, senhaHash: await sha256(senha), perfil, ativo:true, criadoEm: new Date().toISOString()};
+        await dbPutUsuario(novo);
+        usuariosExistentes.push(novo);
+        criados++;
+      }
+    }
+
+    const resumo = 'Importação concluída: ' + criados + ' criado(s), ' + atualizados + ' atualizado(s), ' + ignorados + ' ignorado(s).';
+    carregarTabelaUsuarios();
+    if(avisos.length){
+      alert(resumo + '\n\nAvisos:\n' + avisos.join('\n'));
+    }else{
+      alert(resumo);
+    }
+  }catch(err){
+    alert('Erro ao ler o arquivo CSV: ' + err.message);
+  }finally{
+    evt.target.value = '';
+  }
+}
 
 // =========================================================
 // JAVASCRIPT COMPLETO (mantido da versão anterior, com correções)
@@ -332,11 +857,16 @@ function atualizarDataHoraFm(){
 }
 
 function mostrarAba(nome){
+  if(nome==='usuarios' && !ehAdmin()) return;
+
   document.getElementById('tab-consulta').style.display = (nome==='consulta') ? '' : 'none';
   document.getElementById('tab-fm').style.display = (nome==='fm') ? '' : 'none';
+  document.getElementById('tab-usuarios').style.display = (nome==='usuarios') ? '' : 'none';
   document.getElementById('tabBtnConsulta').classList.toggle('active', nome==='consulta');
   document.getElementById('tabBtnFm').classList.toggle('active', nome==='fm');
+  document.getElementById('tabBtnUsuarios').classList.toggle('active', nome==='usuarios');
   if(nome==='fm') atualizarDataHoraFm();
+  if(nome==='usuarios') carregarTabelaUsuarios();
 }
 
 let baseMap = null;
@@ -505,7 +1035,7 @@ function fecharCamera() {
 // =========================================================
 function abrirBancoLocal(){
   return new Promise((resolve, reject)=>{
-    const req = indexedDB.open('GuardaDeLentesDB', 2);
+    const req = indexedDB.open('GuardaDeLentesDB', 3);
     req.onupgradeneeded = function(ev){
       const d = ev.target.result;
       if(!d.objectStoreNames.contains('bases')){
@@ -516,6 +1046,10 @@ function abrirBancoLocal(){
       }
       if(!d.objectStoreNames.contains('config')){
         d.createObjectStore('config', {keyPath:'chave'});
+      }
+      // v3: usuários do sistema (login/senha com hash, perfil admin/operador)
+      if(!d.objectStoreNames.contains('usuarios')){
+        d.createObjectStore('usuarios', {keyPath:'id', autoIncrement:true});
       }
     };
     req.onsuccess = function(ev){ resolve(ev.target.result); };
@@ -537,6 +1071,43 @@ function carregarConfigLocal(chave){
     const tx = dbLocal.transaction('config', 'readonly');
     const req = tx.objectStore('config').get(chave);
     req.onsuccess = function(){ resolve(req.result ? req.result.valor : null); };
+    req.onerror = function(ev){ reject(ev.target.error); };
+  });
+}
+
+// ---------- Usuários ----------
+function dbGetAllUsuarios(){
+  return new Promise((resolve, reject)=>{
+    const tx = dbLocal.transaction('usuarios', 'readonly');
+    const req = tx.objectStore('usuarios').getAll();
+    req.onsuccess = function(){ resolve(req.result || []); };
+    req.onerror = function(ev){ reject(ev.target.error); };
+  });
+}
+
+function dbGetUsuario(id){
+  return new Promise((resolve, reject)=>{
+    const tx = dbLocal.transaction('usuarios', 'readonly');
+    const req = tx.objectStore('usuarios').get(id);
+    req.onsuccess = function(){ resolve(req.result || null); };
+    req.onerror = function(ev){ reject(ev.target.error); };
+  });
+}
+
+function dbPutUsuario(obj){
+  return new Promise((resolve, reject)=>{
+    const tx = dbLocal.transaction('usuarios', 'readwrite');
+    const req = tx.objectStore('usuarios').put(obj);
+    req.onsuccess = function(){ resolve(req.result); };
+    req.onerror = function(ev){ reject(ev.target.error); };
+  });
+}
+
+function dbDeleteUsuario(id){
+  return new Promise((resolve, reject)=>{
+    const tx = dbLocal.transaction('usuarios', 'readwrite');
+    const req = tx.objectStore('usuarios').delete(id);
+    req.onsuccess = function(){ resolve(); };
     req.onerror = function(ev){ reject(ev.target.error); };
   });
 }
@@ -812,6 +1383,7 @@ function ativarBase(entrada){
 async function inicializarBancoLocal(){
   try{
     dbLocal = await abrirBancoLocal();
+    verificarAcessoInicial();
 
     // Tenta conectar ao Supabase (compartilhado)
     const conectou = await tentarConectarBancoExterno();
@@ -1069,7 +1641,8 @@ function carregarBase(evt){
         fmRows: novasFmRows,
         cabecalho: cabecalhoFm,
         rotulosColuna: rotulosColuna,
-        baseEntries: Array.from(novoMap.entries())
+        baseEntries: Array.from(novoMap.entries()),
+        carregadoPor: obterUsuarioAtual()
       };
 
       try{
@@ -1123,7 +1696,7 @@ function buscarSerial(codigoOriginal){
   atualizarContadores();
 
   const hora = new Date().toLocaleTimeString('pt-BR');
-  const leitura = {hora, codigo:codigoOriginal, serial, posicao, status, achou, ts:Date.now()};
+  const leitura = {hora, codigo:codigoOriginal, serial, posicao, status, achou, ts:Date.now(), usuario: obterUsuarioAtual()};
   historico.unshift(leitura);
   if(historico.length > 10) historico.pop();
   desenharHistorico();
@@ -1141,7 +1714,7 @@ function desenharHistorico(){
   const tbody = document.getElementById('histBody');
   tbody.innerHTML = historico.map(h =>
     '<tr><td>'+h.hora+'</td><td>'+h.codigo+'</td><td>'+h.serial+'</td><td>'+h.posicao+'</td>'+
-    '<td class="'+(h.achou?'status-ok':'status-no')+'">'+h.status+'</td></tr>'
+    '<td class="'+(h.achou?'status-ok':'status-no')+'">'+h.status+'</td><td>'+(h.usuario||'—')+'</td></tr>'
   ).join('');
 }
 
@@ -1347,9 +1920,9 @@ async function baixarHistoricoCSV(){
     console.error('Erro ao ler histórico do banco de dados, usando o que está na tela:', err);
   }
   if(registros.length===0){ alert('Não há leituras registradas para baixar.'); return; }
-  let csv = 'Hora;Codigo Lido;Serial;Posicao;Status\n';
+  let csv = 'Hora;Codigo Lido;Serial;Posicao;Status;Usuario\n';
   registros.forEach(h=>{
-    csv += [h.hora, h.codigo, h.serial, h.posicao, h.status].join(';') + '\n';
+    csv += [h.hora, h.codigo, h.serial, h.posicao, h.status, h.usuario||''].join(';') + '\n';
   });
   const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
