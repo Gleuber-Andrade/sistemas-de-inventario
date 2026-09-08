@@ -1444,9 +1444,9 @@ function extrairSerial(codigo){
     case 53: return codigo.substr(44,9);
     case 58: return codigo.slice(-9);
     case 59: return codigo.slice(-9);
-    case 21: return codigo.substr(1,11);
+    case 21: return codigo.substr(2,11);
     default:
-      return (n > 11) ? codigo.substr(1,11) : codigo;
+      return (n > 11) ? codigo.substr(2,11) : codigo;
   }
 }
 
