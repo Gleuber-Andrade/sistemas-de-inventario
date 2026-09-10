@@ -1568,7 +1568,7 @@ function solicitarCargaBase(){
   }
   const senha = prompt('Digite a senha para liberar o carregamento da base de dados:');
   if(senha===null) return;
-  const SENHA_CARGA = 'supervisor';
+  const SENHA_CARGA = 'inventario';
   if(senha !== SENHA_CARGA){
     alert('Senha incorreta. Carregamento não liberado.');
     return;
@@ -1811,7 +1811,7 @@ function exportarBaseEscolhidaCSV(){
 async function excluirBaseSelecionada(){
   const senha = prompt('Digite a senha para excluir a base de dados:');
   if(senha===null) return;
-  const SENHA_EXCLUSAO = 'excluir123';
+  const SENHA_EXCLUSAO = 'inventario';
   if(senha !== SENHA_EXCLUSAO){
     alert('Senha incorreta. Exclusão cancelada.');
     return;
