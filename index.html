@@ -419,10 +419,48 @@ function dbPutMemoria(store, obj){
   return Promise.resolve(obj.id);
 }
 
-/* ---- Camada única usada pelo resto do código: escolhe IndexedDB ou memória ---- */
-function dbGetAll(store){ return usarBancoMemoria ? dbGetAllMemoria(store) : dbGetAllIndexedDB(store); }
-function dbGet(store, key){ return usarBancoMemoria ? dbGetMemoria(store, key) : dbGetIndexedDB(store, key); }
-function dbPut(store, obj){ return usarBancoMemoria ? dbPutMemoria(store, obj) : dbPutIndexedDB(store, obj); }
+/* ---- Camada única usada pelo resto do código: escolhe servidor, IndexedDB ou memória ---- */
+// Se PORTAL_API_URL estiver preenchida, a lista de usuários passa a ser
+// compartilhada entre todos os computadores (via o servidor próprio). A
+// sessão de "continuar logado" (store 'config') continua sempre local a
+// cada navegador — não precisa ser compartilhada.
+const PORTAL_API_URL = 'https://portal-api.vilarealfutsal.com.br'; // <-- preencha com a URL do backend do portal (ex: 'https://portal-api.SEUDOMINIO.com')
+const PORTAL_API_KEY = ''; // <-- mesma senha configurada no servidor, se houver
+
+function cabecalhosPortalApi(){
+  const h = {'Content-Type':'application/json'};
+  if(PORTAL_API_KEY) h['Authorization'] = 'Bearer ' + PORTAL_API_KEY;
+  return h;
+}
+
+async function dbGetAll(store){
+  if(store === 'usuarios' && PORTAL_API_URL){
+    const resp = await fetch(PORTAL_API_URL + '/usuarios', {headers: cabecalhosPortalApi()});
+    if(!resp.ok) throw new Error('Erro ao buscar usuários no servidor (HTTP ' + resp.status + ').');
+    return await resp.json();
+  }
+  return usarBancoMemoria ? dbGetAllMemoria(store) : dbGetAllIndexedDB(store);
+}
+async function dbGet(store, key){
+  if(store === 'usuarios' && PORTAL_API_URL){
+    const resp = await fetch(PORTAL_API_URL + '/usuarios/' + key, {headers: cabecalhosPortalApi()});
+    if(resp.status === 404) return null;
+    if(!resp.ok) throw new Error('Erro ao buscar usuário no servidor (HTTP ' + resp.status + ').');
+    return await resp.json();
+  }
+  return usarBancoMemoria ? dbGetMemoria(store, key) : dbGetIndexedDB(store, key);
+}
+async function dbPut(store, obj){
+  if(store === 'usuarios' && PORTAL_API_URL){
+    const resp = await fetch(PORTAL_API_URL + '/usuarios', {
+      method: 'POST', headers: cabecalhosPortalApi(), body: JSON.stringify(obj)
+    });
+    if(!resp.ok) throw new Error('Erro ao salvar usuário no servidor (HTTP ' + resp.status + ').');
+    const salvo = await resp.json();
+    return salvo.id;
+  }
+  return usarBancoMemoria ? dbPutMemoria(store, obj) : dbPutIndexedDB(store, obj);
+}
 
 async function sha256(texto){
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(texto));
