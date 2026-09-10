@@ -726,6 +726,46 @@ const state = {
   fmRows: []
 };
 
+// =========================================================
+// Configuração de equipamentos compartilhada pelo servidor
+// (opcional — se PALLETS_API_URL ficar em branco, o sistema continua
+// funcionando exatamente como antes, só que sem guardar a configuração
+// entre um uso e outro).
+// =========================================================
+const PALLETS_API_URL = ''; // <-- preencha com a URL do backend (ex: 'https://compactacao-api.SEUDOMINIO.com')
+const PALLETS_API_KEY = ''; // <-- mesma senha configurada no servidor, se houver
+
+function cabecalhosPalletsApi(){
+  const h = {'Content-Type':'application/json'};
+  if(PALLETS_API_KEY) h['Authorization'] = 'Bearer ' + PALLETS_API_KEY;
+  return h;
+}
+
+async function carregarEquipamentosDoServidor(){
+  if(!PALLETS_API_URL) return;
+  try{
+    const resp = await fetch(PALLETS_API_URL + '/equipamentos', {headers: cabecalhosPalletsApi()});
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    const dados = await resp.json();
+    if(Array.isArray(dados) && dados.length > 0){
+      state.equipamentos = dados;
+    }
+  }catch(err){
+    console.warn('Não consegui carregar a configuração de equipamentos do servidor — usando os valores padrão.', err);
+  }
+}
+
+async function salvarEquipamentosNoServidor(){
+  if(!PALLETS_API_URL) return;
+  try{
+    await fetch(PALLETS_API_URL + '/equipamentos', {
+      method: 'POST', headers: cabecalhosPalletsApi(), body: JSON.stringify(state.equipamentos)
+    });
+  }catch(err){
+    console.warn('Não consegui salvar a configuração de equipamentos no servidor (ficou salva só neste computador, na memória desta aba).', err);
+  }
+}
+
 /* ============================================================
    UTILITÁRIOS
    ============================================================ */
@@ -1091,6 +1131,7 @@ function adicionarEquipamento(){
   const n = state.equipamentos.length + 1;
   state.equipamentos.push({id:'eq'+Date.now(), nome:'L0'+n, limiteTipo:'pct', limiteValor:50, padrao:false, categorias:[]});
   renderizarEquipamentos();
+  salvarEquipamentosNoServidor();
 }
 
 function removerEquipamento(id){
@@ -1101,11 +1142,13 @@ function removerEquipamento(id){
     state.equipamentos[state.equipamentos.length-1].padrao = true;
   }
   renderizarEquipamentos();
+  salvarEquipamentosNoServidor();
 }
 
 function marcarPadraoEquipamento(id){
   state.equipamentos.forEach(e => e.padrao = (e.id === id));
   renderizarEquipamentos();
+  salvarEquipamentosNoServidor();
 }
 
 function atualizarCampoEquipamento(id, campo, valor){
@@ -1116,6 +1159,7 @@ function atualizarCampoEquipamento(id, campo, valor){
   else eq[campo] = valor;
   atualizarLegendaEquipamentos();
   atualizarChecklist();
+  salvarEquipamentosNoServidor();
 }
 
 function renderizarEquipamentos(){
@@ -1810,12 +1854,13 @@ function configurarDropzone(tipo){
   });
 }
 
-document.addEventListener('DOMContentLoaded', function(){
+document.addEventListener('DOMContentLoaded', async function(){
   ['estoque','layout','maestro'].forEach(configurarDropzone);
   document.getElementById('clienteSelect').addEventListener('change', function(){
     state.cliente = this.value;
     atualizarChecklist();
   });
+  await carregarEquipamentosDoServidor();
   renderizarEquipamentos();
   document.getElementById('inpBuscarPosicao').addEventListener('change', function(){
     state.buscarNovaPosicao = this.checked;
