@@ -1,0 +1,1885 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compactação de Pallets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#F5F6FA;
+    --surface:#FFFFFF;
+    --surface-2:#EEF1F8;
+    --ink:#1B2333;
+    --ink-soft:#5B6478;
+    --border:#DCE1EE;
+    --accent:#0F7A73;
+    --accent-ink:#FFFFFF;
+    --accent-soft:#E3F3F1;
+    --accent-strong:#0B5E59;
+    --signal:#F5A623;
+    --signal-soft:#FDF0DA;
+    --success:#2E9E5B;
+    --success-soft:#E4F5EA;
+    --danger:#D6455B;
+    --danger-soft:#FBE7EA;
+    --warning:#C8791A;
+    --warning-soft:#FBEEDB;
+    --info:#3B7FC4;
+    --info-soft:#E6EFFA;
+    --shadow:0 1px 2px rgba(27,35,51,.06), 0 8px 24px -12px rgba(27,35,51,.18);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#10151F;
+      --surface:#171E2C;
+      --surface-2:#1E2637;
+      --ink:#EAF0FA;
+      --ink-soft:#93A0BA;
+      --border:#2B3547;
+      --accent:#2FD1BF;
+      --accent-ink:#06201D;
+      --accent-soft:#123430;
+      --accent-strong:#7FEAE0;
+      --signal:#FFC24D;
+      --signal-soft:#3A2C14;
+      --success:#49CC8B;
+      --success-soft:#123322;
+      --danger:#FF7A8E;
+      --danger-soft:#3A1620;
+      --warning:#F0B255;
+      --warning-soft:#3A2A10;
+      --info:#7FB4EE;
+      --info-soft:#132A42;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 28px -12px rgba(0,0,0,.6);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#10151F;
+    --surface:#171E2C;
+    --surface-2:#1E2637;
+    --ink:#EAF0FA;
+    --ink-soft:#93A0BA;
+    --border:#2B3547;
+    --accent:#2FD1BF;
+    --accent-ink:#06201D;
+    --accent-soft:#123430;
+    --accent-strong:#7FEAE0;
+    --signal:#FFC24D;
+    --signal-soft:#3A2C14;
+    --success:#49CC8B;
+    --success-soft:#123322;
+    --danger:#FF7A8E;
+    --danger-soft:#3A1620;
+    --warning:#F0B255;
+    --warning-soft:#3A2A10;
+    --info:#7FB4EE;
+    --info-soft:#132A42;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 28px -12px rgba(0,0,0,.6);
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Public Sans", -apple-system, Segoe UI, Arial, sans-serif;
+    font-size:15px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{font-family:"Baloo 2", "Public Sans", sans-serif; text-wrap:balance;}
+  .mono, .num, td.num, .code{font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums;}
+  a{color:var(--accent);}
+  button{font-family:inherit;}
+  ::selection{background:var(--accent-soft); color:var(--ink);}
+
+  /* ---------- App shell ---------- */
+  .app{min-height:100vh; display:flex; flex-direction:column;}
+  .topbar{
+    background:linear-gradient(135deg, var(--accent-strong), var(--accent));
+    color:var(--accent-ink);
+    padding:18px 28px;
+    display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;
+  }
+  :root[data-theme="dark"] .topbar, @media (prefers-color-scheme: dark){ }
+  .brand{display:flex; align-items:center; gap:14px;}
+  .brand-mark{width:44px; height:44px; flex:none; filter:drop-shadow(0 2px 3px rgba(0,0,0,.15));}
+  .brand h1{margin:0; font-size:1.32rem; font-weight:800; letter-spacing:.2px;}
+  .brand p{margin:2px 0 0; font-size:.82rem; opacity:.92; font-weight:500;}
+  .topbar-right{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .cliente-field{display:flex; flex-direction:column; gap:3px;}
+  .cliente-field label{font-size:.68rem; text-transform:uppercase; letter-spacing:.06em; font-weight:700; opacity:.85;}
+  .cliente-field select, .cliente-field input{
+    background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.4); color:var(--accent-ink);
+    padding:7px 10px; border-radius:8px; font-size:.88rem; font-weight:600; min-width:190px;
+  }
+  .cliente-field select option{color:#1B2333;}
+  .cliente-field select:focus, .cliente-field input:focus{outline:2px solid rgba(255,255,255,.8);}
+  .stat-chips{display:flex; gap:10px; flex-wrap:wrap;}
+  .stat-chip{
+    background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.3); border-radius:10px;
+    padding:6px 12px; text-align:center; min-width:84px;
+  }
+  .stat-chip .n{display:block; font-family:"IBM Plex Mono", monospace; font-weight:600; font-size:1.05rem; line-height:1.1;}
+  .stat-chip .l{display:block; font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; opacity:.9; margin-top:2px;}
+
+  .tabs{
+    display:flex; gap:6px; padding:10px 24px; background:var(--surface); border-bottom:1px solid var(--border);
+    overflow-x:auto; flex-wrap:wrap;
+  }
+  .tab-btn{
+    display:flex; align-items:center; gap:8px;
+    background:transparent; border:1px solid transparent; color:var(--ink-soft);
+    padding:9px 16px; border-radius:999px; cursor:pointer; font-size:.88rem; font-weight:600;
+    transition:background .15s, color .15s;
+    white-space:nowrap;
+  }
+  .tab-btn svg{width:16px; height:16px; flex:none;}
+  .tab-btn:hover{background:var(--surface-2); color:var(--ink);}
+  .tab-btn.active{background:var(--accent-soft); color:var(--accent-strong); border-color:var(--accent);}
+  .tab-btn .badge-count{
+    background:var(--accent); color:var(--accent-ink); border-radius:999px; font-size:.68rem; font-weight:700;
+    padding:1px 7px; font-family:"IBM Plex Mono", monospace;
+  }
+
+  main{flex:1; width:100%; max-width:1280px; margin:0 auto; padding:24px 24px 64px; display:flex; flex-direction:column; gap:20px;}
+  .tab-panel{display:none; flex-direction:column; gap:20px; animation:fadein .18s ease;}
+  .tab-panel.active{display:flex;}
+  @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+  @media (prefers-reduced-motion:reduce){ .tab-panel{animation:none;} }
+
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:20px 22px; box-shadow:var(--shadow);
+  }
+  .card h2{margin:0 0 4px; font-size:1.08rem; font-weight:700;}
+  .card .sub{margin:0 0 16px; color:var(--ink-soft); font-size:.86rem;}
+  .card-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px;}
+  .card-head-text h2{margin:0;}
+  .card-head-text .sub{margin:2px 0 0;}
+
+  .grid-3{display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); gap:16px;}
+  .grid-4{display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:14px;}
+
+  /* ---------- Upload cards ---------- */
+  .upload-card{
+    border:1px solid var(--border); border-radius:14px; padding:18px; background:var(--surface);
+    display:flex; flex-direction:column; gap:10px; position:relative; overflow:hidden;
+  }
+  .upload-card::before{content:""; position:absolute; inset:0 0 auto 0; height:4px; background:var(--accent-line, var(--accent));}
+  .upload-card.tone-estoque{--accent-line:#0F7A73;}
+  .upload-card.tone-layout{--accent-line:#C8791A;}
+  .upload-card.tone-maestro{--accent-line:#3B7FC4;}
+  .upload-card .uc-head{display:flex; align-items:center; gap:10px;}
+  .uc-icon{width:34px; height:34px; flex:none; border-radius:9px; display:flex; align-items:center; justify-content:center;}
+  .tone-estoque .uc-icon{background:var(--accent-soft); color:var(--accent-strong);}
+  .tone-layout .uc-icon{background:var(--signal-soft); color:var(--warning);}
+  .tone-maestro .uc-icon{background:var(--info-soft); color:var(--info);}
+  .uc-icon svg{width:19px; height:19px;}
+  .uc-head h3{margin:0; font-size:.98rem; font-weight:700;}
+  .uc-head .status-dot{width:9px; height:9px; border-radius:50%; background:var(--border); margin-left:auto; flex:none;}
+  .uc-head .status-dot.ok{background:var(--success);}
+  .uc-head .status-dot.err{background:var(--danger);}
+  .upload-card p.desc{margin:0; font-size:.82rem; color:var(--ink-soft);}
+  .dropzone{
+    border:1.5px dashed var(--border); border-radius:10px; padding:16px 12px; text-align:center;
+    font-size:.82rem; color:var(--ink-soft); cursor:pointer; transition:border-color .15s, background .15s;
+  }
+  .dropzone:hover, .dropzone.drag{border-color:var(--accent); background:var(--accent-soft);}
+  .dropzone strong{color:var(--ink); display:block; font-size:.86rem; margin-bottom:2px;}
+  .file-meta{display:none; align-items:center; justify-content:space-between; gap:8px; background:var(--surface-2); border-radius:8px; padding:8px 10px; font-size:.78rem;}
+  .file-meta.show{display:flex;}
+  .file-meta .fname{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600;}
+  .file-meta .frows{color:var(--ink-soft); flex:none; font-family:"IBM Plex Mono", monospace;}
+  input[type=file]{display:none;}
+
+  details.mapdet{font-size:.78rem;}
+  details.mapdet summary{cursor:pointer; color:var(--accent-strong); font-weight:600; padding:2px 0;}
+  .map-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px 10px; margin-top:10px;}
+  .map-field{display:flex; flex-direction:column; gap:3px;}
+  .map-field label{font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); font-weight:700;}
+  .map-field label .req{color:var(--danger);}
+  .map-field select{
+    padding:6px 8px; border-radius:7px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-size:.8rem;
+  }
+  .map-warn{font-size:.74rem; color:var(--warning); display:none;}
+  .map-warn.show{display:block;}
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:7px;
+    background:var(--accent); color:var(--accent-ink); border:1px solid var(--accent);
+    padding:10px 18px; border-radius:10px; cursor:pointer; font-size:.88rem; font-weight:700;
+    transition:filter .12s, transform .05s;
+  }
+  .btn svg{width:16px; height:16px;}
+  .btn:hover{filter:brightness(1.08);}
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:.45; cursor:not-allowed; filter:none;}
+  .btn.secondary{background:transparent; color:var(--accent-strong); border-color:var(--accent);}
+  .btn.ghost{background:transparent; color:var(--ink-soft); border-color:var(--border);}
+  .btn.danger{background:transparent; color:var(--danger); border-color:var(--danger);}
+  .btn.sm{padding:7px 12px; font-size:.78rem; border-radius:8px;}
+  .btn.block{width:100%;}
+  .btn-row{display:flex; gap:10px; flex-wrap:wrap;}
+
+  .info-box{
+    background:var(--accent-soft); border:1px solid var(--accent); border-radius:12px; padding:14px 16px;
+    font-size:.84rem; color:var(--ink); display:flex; gap:12px; align-items:flex-start;
+  }
+  .info-box svg{width:20px; height:20px; flex:none; color:var(--accent-strong); margin-top:1px;}
+  .info-box b{color:var(--accent-strong);}
+
+  /* ---------- Params tab ---------- */
+  .field-row{display:flex; flex-direction:column; gap:5px; max-width:420px;}
+  .field-row label{font-size:.82rem; font-weight:700;}
+  .field-row .help{font-size:.76rem; color:var(--ink-soft);}
+  .field-row input[type=number], .field-row input[type=text]{
+    padding:9px 11px; border-radius:9px; border:1px solid var(--border); background:var(--surface); color:var(--ink);
+    font-family:"IBM Plex Mono", monospace; font-size:.92rem; max-width:140px;
+  }
+  .equip-legend{display:flex; gap:8px; flex-wrap:wrap;}
+  .equip-legend .leg-chip{
+    display:inline-flex; align-items:center; gap:7px; padding:5px 12px; border-radius:999px;
+    font-size:.78rem; font-weight:600; background:var(--surface-2); border:1px solid var(--border);
+  }
+  .equip-legend .leg-dot{width:9px; height:9px; border-radius:50%; flex:none;}
+  table#tabelaEquipamentos td{vertical-align:middle;}
+  table#tabelaEquipamentos input[type=text]{
+    padding:7px 9px; border-radius:7px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-size:.84rem; width:140px;
+  }
+  table#tabelaEquipamentos input[type=number]{
+    padding:7px 9px; border-radius:7px; border:1px solid var(--border); background:var(--surface); color:var(--ink);
+    font-family:"IBM Plex Mono", monospace; font-size:.84rem; width:90px;
+  }
+  table#tabelaEquipamentos select{padding:7px 9px; border-radius:7px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-size:.84rem;}
+  table#tabelaEquipamentos input[type=radio]{width:16px; height:16px; accent-color:var(--accent);}
+  .equip-color-dot{width:12px; height:12px; border-radius:50%; display:inline-block;}
+
+  .switch-row{display:flex; align-items:center; gap:12px; margin-top:4px;}
+  .switch{position:relative; width:42px; height:24px; flex:none;}
+  .switch input{opacity:0; width:0; height:0;}
+  .switch .track{position:absolute; inset:0; background:var(--border); border-radius:999px; transition:background .15s; cursor:pointer;}
+  .switch .knob{position:absolute; top:3px; left:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .15s; box-shadow:0 1px 2px rgba(0,0,0,.3);}
+  .switch input:checked + .track{background:var(--accent);}
+  .switch input:checked + .track .knob{transform:translateX(18px);}
+
+  .checklist{display:flex; flex-direction:column; gap:8px; margin-top:6px;}
+  .checklist li{list-style:none;}
+  .check-item{display:flex; align-items:center; gap:9px; font-size:.86rem;}
+  .check-item .mark{width:19px; height:19px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex:none; background:var(--surface-2); color:var(--ink-soft); font-size:.7rem; font-weight:800;}
+  .check-item.done .mark{background:var(--success-soft); color:var(--success);}
+  .check-item.done{color:var(--ink);}
+
+  /* ---------- Results ---------- */
+  .summary-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px;}
+  .stat-card{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 16px; box-shadow:var(--shadow);}
+  .stat-card .num{font-family:"IBM Plex Mono", monospace; font-size:1.6rem; font-weight:600; line-height:1.1;}
+  .stat-card .lab{font-size:.78rem; color:var(--ink-soft); margin-top:4px;}
+  .stat-card.c-ok .num{color:var(--success);}
+  .stat-card.c-block .num{color:var(--danger);}
+  .stat-card.c-warn .num{color:var(--warning);}
+
+  .filter-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .chip-filter{
+    background:var(--surface-2); border:1px solid var(--border); color:var(--ink-soft);
+    padding:6px 14px; border-radius:999px; font-size:.8rem; font-weight:600; cursor:pointer;
+  }
+  .chip-filter.active{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+
+  .table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:12px;}
+  table.data{width:100%; border-collapse:collapse; font-size:.82rem; min-width:920px;}
+  table.data thead th{
+    background:var(--surface-2); color:var(--ink-soft); text-transform:uppercase; font-size:.68rem; letter-spacing:.04em;
+    text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; top:0;
+  }
+  table.data tbody td{padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top;}
+  table.data tbody tr:last-child td{border-bottom:none;}
+  table.data tbody tr:hover{background:var(--surface-2);}
+  .pos-tag{display:inline-block; background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:1px 6px; margin:1px 2px 1px 0; font-family:"IBM Plex Mono", monospace; font-size:.74rem;}
+  table.data td:nth-child(5){min-width:230px;}
+  table.data td:nth-child(12){min-width:200px;}
+  .pill{display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:999px; font-size:.72rem; font-weight:700; white-space:nowrap;}
+  .pill.ok{background:var(--success-soft); color:var(--success);}
+  .pill.block{background:var(--danger-soft); color:var(--danger);}
+  .pill.warn{background:var(--warning-soft); color:var(--warning);}
+  .pill.equip{background:var(--info-soft); color:var(--info); font-family:"IBM Plex Mono", monospace;}
+  .occ-wrap{display:flex; flex-direction:column; gap:4px; min-width:110px;}
+  .occ-track{position:relative; height:8px; border-radius:999px; background:var(--surface-2); overflow:hidden; border:1px solid var(--border);}
+  .occ-fill{position:absolute; inset:0 auto 0 0; border-radius:999px;}
+  .occ-pct{font-family:"IBM Plex Mono", monospace; font-size:.76rem; font-weight:600;}
+  .movs{margin:6px 0 0; padding-left:16px; font-size:.76rem; color:var(--ink-soft);}
+  .movs li{margin-bottom:2px;}
+  .obs-text{font-size:.78rem; color:var(--ink-soft); max-width:280px;}
+  .row-expand-btn{background:none; border:none; cursor:pointer; color:var(--ink-soft); font-size:.9rem; padding:0;}
+  tr.detail-row{display:none;}
+  tr.detail-row.show{display:table-row;}
+  tr.detail-row td{background:var(--surface-2); padding:12px 16px;}
+
+  .empty-state{text-align:center; padding:40px 20px; color:var(--ink-soft);}
+  .empty-state svg{width:52px; height:52px; opacity:.5; margin-bottom:10px;}
+  .empty-state h3{margin:0 0 4px; color:var(--ink); font-size:1rem;}
+  .empty-state p{margin:0; font-size:.86rem;}
+
+  /* ---------- FM-EMB23 print doc (kept faithful to the controlled document) ---------- */
+  .fm-toolbar{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px 14px;}
+  .fm-toolbar .ff{display:flex; flex-direction:column; gap:4px;}
+  .fm-toolbar label{font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); font-weight:700;}
+  .fm-toolbar input{padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-size:.86rem;}
+
+  #fm-doc-wrap{background:#fff; border:1px solid #999; padding:14px; overflow-x:auto; border-radius:8px;}
+  #fm-doc-wrap table{width:100%; border-collapse:collapse; table-layout:auto; color:#1a1a1a; font-family:Arial, "Public Sans", sans-serif;}
+  #fm-doc-wrap td, #fm-doc-wrap th{border:1px solid #444; padding:4px 6px;}
+  .fm-logo-cell{text-align:center; vertical-align:middle; padding:4px; width:80px;}
+  .fm-logo-cell img{max-width:100%; height:auto; margin:0 auto;}
+  .fm-logo-cell svg{width:64px; height:40px; margin:0 auto;}
+  .fm-title{text-align:center;}
+  .fm-title .t1{font-weight:800; font-size:1.05rem;}
+  .fm-title .t2{font-weight:700; font-size:.95rem;}
+  .fm-meta{font-size:.78rem; text-align:center;}
+  .fm-field-left{text-align:left; font-size:.82rem; padding:4px 8px;}
+  .fm-field-left strong{font-weight:700;}
+  .fm-field-right{text-align:right; font-size:.82rem; padding:4px 8px;}
+  .fm-field-right .fm-meta{font-weight:700; font-size:.78rem;}
+  .fm-dyn:empty::after{content:"—"; color:#aaa; font-style:italic; font-weight:400;}
+  .fm-section-head{background:#DA251D; color:#fff; font-weight:700; text-align:center;}
+  .fm-col-head{background:#F2F2F2; color:#1a1a1a; font-weight:700; text-align:center; font-size:.72rem; white-space:nowrap;}
+  .fm-data td{text-align:center; font-size:.72rem; white-space:nowrap; line-height:1.3; color:#1a1a1a;}
+  .fm-empty-msg{text-align:center; font-style:italic; color:#888; padding:18px 8px !important; font-size:.85rem !important; white-space:normal !important;}
+  .logo-upload-area{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+  .logo-upload-area .url-input{padding:7px 9px; border-radius:7px; border:1px solid var(--border); font-size:.78rem; min-width:200px;}
+
+  @page{ size: landscape; margin: 8mm; }
+  @media print{
+    body{background:#fff;}
+    .topbar, .tabs, .no-print{display:none !important;}
+    main{max-width:none; margin:0; padding:0;}
+    .tab-panel{display:none !important;}
+    #tab-impressao{display:block !important;}
+    #tab-impressao .card{box-shadow:none; border:none; padding:0;}
+    #fm-doc-wrap{overflow-x:visible !important; border:none; padding:0;}
+    #fmDocTable thead{display:table-header-group;}
+    #fmDocTable tbody tr{page-break-inside:avoid;}
+  }
+
+  footer.app-footer{text-align:center; font-size:.74rem; color:var(--ink-soft); padding:10px 24px 26px;}
+
+  @media (max-width:720px){
+    .topbar{padding:14px 16px;}
+    main{padding:16px 14px 48px;}
+    table.data{min-width:760px;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="4" y="26" width="40" height="6" rx="1.5" fill="currentColor" opacity=".55"/>
+        <rect x="8" y="10" width="13" height="13" rx="2" fill="currentColor"/>
+        <rect x="23" y="10" width="13" height="13" rx="2" fill="currentColor" opacity=".75"/>
+        <rect x="15.5" y="24" width="13" height="13" rx="2" fill="currentColor" opacity=".9"/>
+        <rect x="4" y="38" width="40" height="4" rx="1" fill="currentColor" opacity=".4"/>
+      </svg>
+      <div>
+        <h1>Compactação de Pallets</h1>
+        <p>Consolidação sistêmica por SKU · Lote · Status</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="cliente-field">
+        <label for="clienteSelect">Cliente</label>
+        <select id="clienteSelect"><option value="">— carregue a base de estoque —</option></select>
+      </div>
+      <div class="stat-chips" id="statChips">
+        <div class="stat-chip"><span class="n" id="chipGrupos">0</span><span class="l">Grupos</span></div>
+        <div class="stat-chip"><span class="n" id="chipCompactar">0</span><span class="l">Compactar</span></div>
+        <div class="stat-chip"><span class="n" id="chipBloq">0</span><span class="l">Bloqueadas</span></div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs no-print" id="tabNav">
+    <button class="tab-btn active" data-tab="importar" onclick="mostrarAba('importar')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      Importar planilhas
+    </button>
+    <button class="tab-btn" data-tab="parametros" onclick="mostrarAba('parametros')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h13M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
+      Parâmetros
+    </button>
+    <button class="tab-btn" data-tab="resultados" onclick="mostrarAba('resultados')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10m6 10V4m6 16v-7"/></svg>
+      Resultados
+      <span class="badge-count" id="tabBadgeResultados" style="display:none;">0</span>
+    </button>
+    <button class="tab-btn" data-tab="impressao" onclick="mostrarAba('impressao')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M6 14h12v7H6z"/></svg>
+      FM-EMB23 · Impressão
+    </button>
+  </nav>
+
+  <main>
+
+    <!-- ================= TAB: IMPORTAR ================= -->
+    <section class="tab-panel active" id="tab-importar">
+
+      <div class="info-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>
+        <div>
+          <b>Como funciona:</b> agrupamos o estoque por <b>SKU + Lote + Status</b>. As posições com <b>menor quantidade são somadas às de maior quantidade</b> até atingir o padrão de pallet definido no <b>Maestro</b> — <b>a menos que</b> algum equipamento tenha um limite em <b>unidades</b> mapeado especificamente para a categoria do produto, caso em que esse valor passa a ser o padrão de agrupamento e o do Maestro é desconsiderado. Se a soma ultrapassar 100% da capacidade considerada, a junção <b>não é executada</b>. O pallet final é direcionado ao equipamento cujo limite (em % de ocupação ou em unidades) comporte o resultado <b>e que aceite a categoria do produto</b> — do mais restrito ao equipamento padrão, que cobre o restante até 100%. Se não houver posição livre (status Vazio) no equipamento desejado, o sistema tenta o próximo, na ordem dos limites. Os equipamentos, seus limites, as categorias aceitas e qual é o padrão são totalmente configuráveis na aba Parâmetros.
+        </div>
+      </div>
+
+      <div class="grid-3">
+
+        <div class="upload-card tone-estoque" id="uploadCard-estoque">
+          <div class="uc-head">
+            <div class="uc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="1.5"/><path d="M3 7l2.5-4h13L21 7M9 11h6"/></svg></div>
+            <h3>Posição de Estoque</h3>
+            <span class="status-dot" id="dot-estoque"></span>
+          </div>
+          <p class="desc">Posição atual do estoque: SKU, lote, status, posição e quantidade.</p>
+          <div class="dropzone" id="drop-estoque" onclick="document.getElementById('file-estoque').click()">
+            <strong>Escolher arquivo</strong> ou arraste aqui (.xlsx, .xls, .csv)
+          </div>
+          <input type="file" id="file-estoque" accept=".xlsx,.xls,.csv">
+          <div class="file-meta" id="meta-estoque">
+            <span class="fname" id="fname-estoque"></span>
+            <span class="frows" id="frows-estoque"></span>
+          </div>
+          <details class="mapdet" id="mapdet-estoque" style="display:none;">
+            <summary>Mapeamento de colunas</summary>
+            <div class="map-grid" id="mapgrid-estoque"></div>
+            <div class="map-warn" id="mapwarn-estoque">Confira as colunas obrigatórias — não localizadas automaticamente.</div>
+          </details>
+        </div>
+
+        <div class="upload-card tone-layout" id="uploadCard-layout">
+          <div class="uc-head">
+            <div class="uc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+            <h3>Layout do Armazém</h3>
+            <span class="status-dot" id="dot-layout"></span>
+          </div>
+          <p class="desc">Mapa de posições: tipo de equipamento (conforme cadastrado nos Parâmetros) e status (E = vazio).</p>
+          <div class="dropzone" id="drop-layout" onclick="document.getElementById('file-layout').click()">
+            <strong>Escolher arquivo</strong> ou arraste aqui (.xlsx, .xls, .csv)
+          </div>
+          <input type="file" id="file-layout" accept=".xlsx,.xls,.csv">
+          <div class="file-meta" id="meta-layout">
+            <span class="fname" id="fname-layout"></span>
+            <span class="frows" id="frows-layout"></span>
+          </div>
+          <details class="mapdet" id="mapdet-layout" style="display:none;">
+            <summary>Mapeamento de colunas</summary>
+            <div class="map-grid" id="mapgrid-layout"></div>
+            <div class="map-warn" id="mapwarn-layout">Confira as colunas obrigatórias — não localizadas automaticamente.</div>
+          </details>
+        </div>
+
+        <div class="upload-card tone-maestro" id="uploadCard-maestro">
+          <div class="uc-head">
+            <div class="uc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+            <h3>Maestro de SKU</h3>
+            <span class="status-dot" id="dot-maestro"></span>
+          </div>
+          <p class="desc">Padrão de pallet por SKU — usado para calcular a ocupação.</p>
+          <div class="dropzone" id="drop-maestro" onclick="document.getElementById('file-maestro').click()">
+            <strong>Escolher arquivo</strong> ou arraste aqui (.xlsx, .xls, .csv)
+          </div>
+          <input type="file" id="file-maestro" accept=".xlsx,.xls,.csv">
+          <div class="file-meta" id="meta-maestro">
+            <span class="fname" id="fname-maestro"></span>
+            <span class="frows" id="frows-maestro"></span>
+          </div>
+          <details class="mapdet" id="mapdet-maestro" style="display:none;">
+            <summary>Mapeamento de colunas</summary>
+            <div class="map-grid" id="mapgrid-maestro"></div>
+            <div class="map-warn" id="mapwarn-maestro">Confira as colunas obrigatórias — não localizadas automaticamente.</div>
+          </details>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= TAB: PARAMETROS ================= -->
+    <section class="tab-panel" id="tab-parametros">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-text"><h2>Equipamentos e limites de agrupamento</h2><p class="sub">Cadastre quantos equipamentos o armazém usar. Cada um tem um limite máximo para o agrupamento — em % de ocupação do pallet ou em unidades — e pode ser restrito a categorias de produto específicas (deixe em branco para aceitar qualquer categoria). Marque um como padrão (cobre o restante, até 100%).</p></div>
+        </div>
+
+        <div class="equip-legend" id="equipLegend"></div>
+
+        <div class="table-wrap" style="margin-top:14px;">
+          <table class="data" id="tabelaEquipamentos">
+            <thead>
+              <tr><th style="width:26px;"></th><th>Nome do equipamento</th><th>Limite para agrupar</th><th>Tipo de limite</th><th>Categorias aceitas</th><th>Padrão (cobre o restante)</th><th></th></tr>
+            </thead>
+            <tbody id="corpoEquipamentos"></tbody>
+          </table>
+        </div>
+        <datalist id="listaCategorias"></datalist>
+        <div class="btn-row" style="margin-top:12px;">
+          <button class="btn secondary sm" onclick="adicionarEquipamento()">+ Adicionar equipamento</button>
+        </div>
+        <div class="map-warn show" id="equipWarn" style="margin-top:8px;"></div>
+        <div class="help" style="margin-top:8px;">Deixe "Categorias aceitas" em branco para o equipamento aceitar qualquer categoria de produto. Se um pallet tiver uma categoria que nenhum equipamento aceita, o sistema avisa na observação do resultado e usa a lista completa de equipamentos como alternativa. <strong>Importante:</strong> se um equipamento estiver configurado com limite em <strong>unidades</strong> para uma categoria específica, esse valor passa a ser o próprio padrão de agrupamento (capacidade do pallet) para os grupos dessa categoria — o padrão cadastrado no Maestro é desconsiderado nesse caso.</div>
+
+        <div class="switch-row" style="margin-top:18px;">
+          <label class="switch"><input type="checkbox" id="inpBuscarPosicao" checked><span class="track"><span class="knob"></span></span></label>
+          <div>
+            <div style="font-weight:700; font-size:.86rem;">Buscar nova posição no Layout para o pallet consolidado</div>
+            <div class="help">Se desligado, o destino sempre permanece na posição de maior quantidade. Se ligado, ao não achar posição livre no equipamento desejado, o sistema tenta o próximo equipamento (em ordem de limite), até o padrão.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="card-head-text"><h2>Checklist antes de rodar</h2></div></div>
+        <ul class="checklist" id="checklist">
+          <li><div class="check-item" id="chk-estoque"><span class="mark">✕</span> Posição de Estoque carregada</div></li>
+          <li><div class="check-item" id="chk-layout"><span class="mark">✕</span> Layout do Armazém carregado</div></li>
+          <li><div class="check-item" id="chk-maestro"><span class="mark">✕</span> Maestro de SKU carregado</div></li>
+          <li><div class="check-item" id="chk-cliente"><span class="mark">✕</span> Cliente selecionado</div></li>
+          <li><div class="check-item" id="chk-equipamentos"><span class="mark">✕</span> Ao menos 1 equipamento configurado, com 1 marcado como padrão</div></li>
+        </ul>
+        <div class="btn-row" style="margin-top:16px;">
+          <button class="btn" id="btnRodar" disabled onclick="runAnalysis()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 9-14 9V3z"/></svg>
+            Rodar análise de compactação
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB: RESULTADOS ================= -->
+    <section class="tab-panel" id="tab-resultados">
+      <div id="resultadosEmpty" class="card empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 20V10m6 10V4m6 16v-7"/></svg>
+        <h3>Nenhuma análise rodada ainda</h3>
+        <p>Importe as três planilhas, selecione o cliente e rode a análise na aba Parâmetros.</p>
+      </div>
+
+      <div id="resultadosConteudo" style="display:none; flex-direction:column; gap:20px;">
+        <div class="summary-row">
+          <div class="stat-card"><div class="num" id="sumGrupos">0</div><div class="lab">Grupos fragmentados</div></div>
+          <div class="stat-card c-ok"><div class="num" id="sumCompactar">0</div><div class="lab">Compactações sugeridas</div></div>
+          <div class="stat-card c-block"><div class="num" id="sumBloqueadas">0</div><div class="lab">Bloqueadas (&gt;100%)</div></div>
+          <div class="stat-card c-warn"><div class="num" id="sumSemPadrao">0</div><div class="lab">Sem padrão no Maestro</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-head-text"><h2>Grupos analisados</h2><p class="sub">Marque as linhas que deseja enviar para o documento de impressão FM-EMB23.</p></div>
+            <div class="btn-row">
+              <button class="btn secondary sm" onclick="marcarTodosCompactaveis()">Marcar todos compactáveis</button>
+              <button class="btn secondary sm" onclick="exportarCSV()">Exportar CSV</button>
+              <button class="btn secondary sm" onclick="exportarXLSX()">Exportar XLSX</button>
+              <button class="btn sm" onclick="enviarParaImpressao()">Enviar selecionados → FM-EMB23</button>
+            </div>
+          </div>
+          <div class="filter-row" style="margin-bottom:12px;">
+            <button class="chip-filter active" data-filtro="todos" onclick="filtrarResultados('todos')">Todos</button>
+            <button class="chip-filter" data-filtro="compactar" onclick="filtrarResultados('compactar')">Compactar</button>
+            <button class="chip-filter" data-filtro="bloqueado" onclick="filtrarResultados('bloqueado')">Bloqueado</button>
+            <button class="chip-filter" data-filtro="sem_padrao" onclick="filtrarResultados('sem_padrao')">Sem padrão</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data" id="tabelaResultados">
+              <thead>
+                <tr>
+                  <th></th><th>SKU</th><th>Lote</th><th>Status</th><th>Categoria</th><th>Posições origem</th>
+                  <th>Qtd. total</th><th>Cap. pallet</th><th>Ocupação final</th><th>Ação</th>
+                  <th>Equipamento</th><th>Posição destino</th><th>Observação</th><th>Imprimir</th>
+                </tr>
+              </thead>
+              <tbody id="corpoResultados"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB: IMPRESSAO ================= -->
+    <section class="tab-panel" id="tab-impressao">
+      <div class="card no-print">
+        <div class="card-head"><div class="card-head-text"><h2>Dados do documento</h2><p class="sub">Preencha os responsáveis antes de imprimir. O logotipo e os campos ficam salvos apenas nesta sessão.</p></div></div>
+        <div class="fm-toolbar">
+          <div class="ff"><label for="fmInpMotivo">Motivo</label><input type="text" id="fmInpMotivo" value="Compactação Sistêmica de Pallets"></div>
+          <div class="ff"><label for="fmInpSolicitante">Solicitante</label><input type="text" id="fmInpSolicitante"></div>
+          <div class="ff"><label for="fmInpDepartamento">Departamento</label><input type="text" id="fmInpDepartamento"></div>
+          <div class="ff"><label for="fmInpRespSistemica">Responsável — Transferência Sistêmica</label><input type="text" id="fmInpRespSistemica"></div>
+          <div class="ff"><label for="fmInpRespFisica">Responsável — Transferência Física</label><input type="text" id="fmInpRespFisica"></div>
+          <div class="ff"><label for="fmInpRespOperacional">Responsável Operacional</label><input type="text" id="fmInpRespOperacional"></div>
+        </div>
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn" onclick="imprimirFm()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M6 14h12v7H6z"/></svg>
+            Imprimir documento
+          </button>
+          <button class="btn ghost" onclick="limparFm()">Limpar linhas</button>
+        </div>
+      </div>
+
+      <div class="card no-print">
+        <div class="logo-upload-area">
+          <button class="btn secondary sm" onclick="document.getElementById('logoFileInput').click()">Escolher imagem para o logo</button>
+          <input type="file" id="logoFileInput" accept="image/*">
+          <input type="text" id="logoUrlInput" class="url-input" placeholder="ou cole a URL da imagem">
+          <button class="btn secondary sm" onclick="carregarLogoUrl()">Carregar URL</button>
+          <button class="btn ghost sm" onclick="restaurarLogoPadrao()">Restaurar logo padrão</button>
+        </div>
+      </div>
+
+      <div class="card" id="fm-print-card">
+        <div id="fm-doc-wrap">
+          <table id="fmDocTable">
+            <colgroup>
+              <col><col><col><col><col><col><col><col><col><col><col>
+            </colgroup>
+            <thead>
+              <tr>
+                <td rowspan="2" colspan="2" class="fm-logo-cell">
+                  <img id="logoImg" alt="Logo" style="display:none;">
+                  <svg id="logoPlaceholder" viewBox="0 0 80 50" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="80" height="50" fill="#DA251D" rx="4"/>
+                    <text x="40" y="30" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" font-weight="bold">LOGO</text>
+                  </svg>
+                </td>
+                <td colspan="7" class="fm-title"><div class="t1">SISTEMA DE GESTÃO DA QUALIDADE</div></td>
+                <td colspan="2" style="text-align:center; font-weight:700;">FM EMB 23</td>
+              </tr>
+              <tr>
+                <td colspan="7" class="fm-title"><div class="t2">TRANSFERÊNCIA DE MERCADORIA</div></td>
+                <td colspan="2" style="text-align:center; font-weight:700;">REVISÃO: 07</td>
+              </tr>
+              <tr>
+                <td colspan="9" class="fm-field-left"><strong>CLIENTE:</strong> <span id="fmCliente" class="fm-dyn"></span></td>
+                <td colspan="2" class="fm-field-right"><span class="fm-meta">DATA</span> <span id="fmData" class="fm-dyn"></span></td>
+              </tr>
+              <tr>
+                <td colspan="9" class="fm-field-left"><strong>MOTIVO:</strong> <span id="fmMotivo" class="fm-dyn"></span></td>
+                <td colspan="2" class="fm-field-right"><span class="fm-meta">HORÁRIO</span> <span id="fmHora" class="fm-dyn"></span></td>
+              </tr>
+              <tr><td colspan="11" class="fm-field-left"><strong>SOLICITANTE:</strong> <span id="fmSolicitante" class="fm-dyn"></span></td></tr>
+              <tr><td colspan="11" class="fm-field-left"><strong>DEPARTAMENTO:</strong> <span id="fmDepartamento" class="fm-dyn"></span></td></tr>
+              <tr><td colspan="11" class="fm-field-left"><strong>RESPONSÁVEL PELA TRANSFERÊNCIA SISTÊMICA:</strong> <span id="fmRespSistemica" class="fm-dyn"></span></td></tr>
+              <tr><td colspan="11" class="fm-field-left"><strong>RESPONSÁVEL PELA TRANSFERÊNCIA FÍSICA:</strong> <span id="fmRespFisica" class="fm-dyn"></span></td></tr>
+              <tr><td colspan="11" class="fm-field-left"><strong>RESPONSÁVEL OPERACIONAL:</strong> <span id="fmRespOperacional" class="fm-dyn"></span></td></tr>
+              <tr>
+                <td colspan="2" class="fm-section-head">ORIGEM</td>
+                <td colspan="6" class="fm-section-head">DADOS DO PRODUTO</td>
+                <td colspan="2" class="fm-section-head">DESTINO</td>
+                <td class="fm-section-head">OBSERVAÇÃO</td>
+              </tr>
+              <tr>
+                <th class="fm-col-head">POSIÇÃO</th>
+                <th class="fm-col-head">STATUS</th>
+                <th class="fm-col-head">SKU</th>
+                <th class="fm-col-head">LOTE</th>
+                <th class="fm-col-head">SÉRIE</th>
+                <th class="fm-col-head">QUANT.</th>
+                <th class="fm-col-head">NFD( ) REMESSA( )</th>
+                <th class="fm-col-head">CATEGORIA</th>
+                <th class="fm-col-head">POSIÇÃO</th>
+                <th class="fm-col-head">STATUS</th>
+                <th class="fm-col-head">OBSERVAÇÃO</th>
+              </tr>
+            </thead>
+            <tbody id="fmDataTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer no-print">Ferramenta de apoio operacional — confira sempre o resultado antes de executar a compactação sistêmica e a movimentação física.</footer>
+</div>
+
+<script>
+/* ============================================================
+   ESTADO GLOBAL
+   ============================================================ */
+const state = {
+  estoque: {raw:[], headerLine:-1, map:{}, headers:[], rows:[], fileName:''},
+  layout:  {raw:[], headerLine:-1, map:{}, headers:[], rows:[], fileName:''},
+  maestro: {raw:[], headerLine:-1, map:{}, headers:[], rows:[], fileName:''},
+  cliente: '',
+  temColunaCliente: false,
+  equipamentos: [
+    {id:'eq1', nome:'L02', limiteTipo:'pct', limiteValor:20, padrao:false, categorias:[]},
+    {id:'eq2', nome:'L03', limiteTipo:'pct', limiteValor:70, padrao:false, categorias:[]},
+    {id:'eq3', nome:'L01', limiteTipo:'pct', limiteValor:100, padrao:true, categorias:[]}
+  ],
+  buscarNovaPosicao: true,
+  resultados: [],
+  filtroAtual: 'todos',
+  fmRows: []
+};
+
+// =========================================================
+// Configuração de equipamentos compartilhada pelo servidor
+// (opcional — se PALLETS_API_URL ficar em branco, o sistema continua
+// funcionando exatamente como antes, só que sem guardar a configuração
+// entre um uso e outro).
+// =========================================================
+const PALLETS_API_URL = 'https://compactacao-api.vilarealfutsal.com.br'; // <-- preencha com a URL do backend (ex: 'https://compactacao-api.SEUDOMINIO.com')
+const PALLETS_API_KEY = ''; // <-- mesma senha configurada no servidor, se houver
+
+function cabecalhosPalletsApi(){
+  const h = {'Content-Type':'application/json'};
+  if(PALLETS_API_KEY) h['Authorization'] = 'Bearer ' + PALLETS_API_KEY;
+  return h;
+}
+
+async function carregarEquipamentosDoServidor(){
+  if(!PALLETS_API_URL) return;
+  try{
+    const resp = await fetch(PALLETS_API_URL + '/equipamentos', {headers: cabecalhosPalletsApi()});
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    const dados = await resp.json();
+    if(Array.isArray(dados) && dados.length > 0){
+      state.equipamentos = dados;
+    }
+  }catch(err){
+    console.warn('Não consegui carregar a configuração de equipamentos do servidor — usando os valores padrão.', err);
+  }
+}
+
+async function salvarEquipamentosNoServidor(){
+  if(!PALLETS_API_URL) return;
+  try{
+    await fetch(PALLETS_API_URL + '/equipamentos', {
+      method: 'POST', headers: cabecalhosPalletsApi(), body: JSON.stringify(state.equipamentos)
+    });
+  }catch(err){
+    console.warn('Não consegui salvar a configuração de equipamentos no servidor (ficou salva só neste computador, na memória desta aba).', err);
+  }
+}
+
+/* ============================================================
+   UTILITÁRIOS
+   ============================================================ */
+function normalizarTexto(s){
+  return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+}
+function paraNumero(v){
+  if(v===undefined||v===null||v==='') return 0;
+  if(typeof v === 'number') return v;
+  let s = v.toString().trim().replace(/[^\d,.\-]/g,'');
+  if(s.indexOf(',')!==-1 && s.indexOf('.')!==-1){
+    s = s.replace(/\./g,'').replace(',', '.');
+  } else if(s.indexOf(',')!==-1){
+    s = s.replace(',', '.');
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+function celula(row, idx){
+  if(idx===undefined || idx===null || idx<0) return '';
+  const v = row[idx];
+  return (v===undefined||v===null) ? '' : v.toString().trim();
+}
+function escapeHtml(s){
+  return (s===undefined||s===null?'':s.toString()).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+/* ============================================================
+   NAVEGAÇÃO POR ABAS
+   ============================================================ */
+function mostrarAba(nome){
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+nome).classList.add('active');
+  document.querySelector('.tab-btn[data-tab="'+nome+'"]').classList.add('active');
+}
+
+/* ============================================================
+   DETECÇÃO DE COLUNAS POR PALAVRA-CHAVE
+   ============================================================ */
+const CAMPOS_ESTOQUE = [
+  {key:'posicao',     match:['POSI']},
+  {key:'status',      match:['STATUS']},
+  {key:'sku',         match:['SKU','COD PRODUTO','CODIGO PRODUTO','CODIGO']},
+  {key:'lote',        match:['LOTE']},
+  {key:'serie',       match:['SERIE','SERIAL']},
+  {key:'quantidade',  match:['QUANT','QTD','SALDO']},
+  {key:'cliente',     match:['CLIENTE']},
+  {key:'categoria',   match:['CATEG']},
+  {key:'descricao',   match:['DESCRI']}
+];
+const CAMPOS_LAYOUT = [
+  {key:'posicao',     match:['POSI']},
+  {key:'equipamento', match:['EQUIPAMENTO','EQUIP','TIPO']},
+  {key:'status',      match:['STATUS']},
+  {key:'cliente',     match:['CLIENTE']}
+];
+const CAMPOS_MAESTRO = [
+  {key:'sku',         match:['SKU','COD PRODUTO','CODIGO PRODUTO','CODIGO']},
+  {key:'capacidade',  match:['CAPAC','PADRAO','QTD PALLET','UND PALLET','UNID PALLET','PALLET']},
+  {key:'cliente',     match:['CLIENTE']},
+  {key:'categoria',   match:['CATEG']},
+  {key:'descricao',   match:['DESCRI']}
+];
+const OBRIGATORIOS = {
+  estoque: ['posicao','status','sku','lote','quantidade'],
+  layout:  ['posicao','equipamento','status'],
+  maestro: ['sku','capacidade']
+};
+const ROTULOS_CAMPO = {
+  posicao:'Posição', status:'Status', sku:'SKU', lote:'Lote', serie:'Série',
+  quantidade:'Quantidade', cliente:'Cliente', categoria:'Categoria', descricao:'Descrição',
+  equipamento:'Equipamento', capacidade:'Capacidade por pallet'
+};
+
+function detectarColunas(headerRow, campos){
+  const cab = headerRow.map(normalizarTexto);
+  const resultado = {};
+  campos.forEach(c => resultado[c.key] = -1);
+  cab.forEach((h, i) => {
+    for(const campo of campos){
+      if(resultado[campo.key] !== -1) continue;
+      if(campo.match.some(m => h.includes(m))){
+        resultado[campo.key] = i;
+        return;
+      }
+    }
+  });
+  return resultado;
+}
+
+function localizarCabecalho(rows, campos, obrigatorios){
+  const limite = Math.min(rows.length, 30);
+  for(let r=0; r<limite; r++){
+    const linha = rows[r] || [];
+    if(linha.length < 2) continue;
+    const cols = detectarColunas(linha, campos);
+    if(obrigatorios.every(k => cols[k] !== -1)){
+      return {linha:r, cols};
+    }
+  }
+  // fallback: assume primeira linha como cabeçalho, mapeamento parcial
+  return {linha:0, cols:detectarColunas(rows[0]||[], campos)};
+}
+
+/* ============================================================
+   LEITURA E MAPEAMENTO DE PLANILHAS
+   ============================================================ */
+const CONFIG_TIPO = {
+  estoque: {campos:CAMPOS_ESTOQUE, obrigatorios:OBRIGATORIOS.estoque},
+  layout:  {campos:CAMPOS_LAYOUT,  obrigatorios:OBRIGATORIOS.layout},
+  maestro: {campos:CAMPOS_MAESTRO, obrigatorios:OBRIGATORIOS.maestro}
+};
+
+function lerArquivo(tipo, file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true});
+      const wsName = wb.SheetNames[0];
+      const ws = wb.Sheets[wsName];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+      if(rows.length < 1){
+        alert('O arquivo "'+file.name+'" não tem linhas.');
+        return;
+      }
+      const cfg = CONFIG_TIPO[tipo];
+      const achado = localizarCabecalho(rows, cfg.campos, cfg.obrigatorios);
+
+      state[tipo].raw = rows;
+      state[tipo].headerLine = achado.linha;
+      state[tipo].map = achado.cols;
+      state[tipo].headers = (rows[achado.linha] || []).map(h => (h===undefined||h===null)?'':h.toString());
+      state[tipo].fileName = file.name;
+
+      reconstruirLinhas(tipo);
+      renderizarMapeamento(tipo);
+      atualizarFileMeta(tipo);
+      atualizarClientesDisponiveis();
+      atualizarCategoriasDisponiveis();
+      atualizarChecklist();
+    }catch(err){
+      console.error(err);
+      alert('Não foi possível ler o arquivo "'+file.name+'". Verifique se é uma planilha válida (.xlsx, .xls ou .csv).\n\nDetalhe: '+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function reconstruirLinhas(tipo){
+  const st = state[tipo];
+  const map = st.map;
+  const dados = [];
+  for(let r = st.headerLine+1; r < st.raw.length; r++){
+    const linha = st.raw[r] || [];
+    if(linha.every(c => c===undefined || c===null || c.toString().trim()==='')) continue;
+    if(tipo === 'estoque'){
+      dados.push({
+        posicao:    celula(linha, map.posicao),
+        status:     celula(linha, map.status),
+        sku:        celula(linha, map.sku),
+        lote:       celula(linha, map.lote),
+        serie:      celula(linha, map.serie),
+        quantidade: paraNumero(celula(linha, map.quantidade)),
+        cliente:    celula(linha, map.cliente),
+        categoria:  celula(linha, map.categoria),
+        descricao:  celula(linha, map.descricao)
+      });
+    } else if(tipo === 'layout'){
+      dados.push({
+        posicao:     celula(linha, map.posicao),
+        equipamento: normalizarTexto(celula(linha, map.equipamento)),
+        status:      normalizarTexto(celula(linha, map.status)),
+        cliente:     celula(linha, map.cliente)
+      });
+    } else if(tipo === 'maestro'){
+      dados.push({
+        sku:        celula(linha, map.sku),
+        capacidade: paraNumero(celula(linha, map.capacidade)),
+        cliente:    celula(linha, map.cliente),
+        categoria:  celula(linha, map.categoria),
+        descricao:  celula(linha, map.descricao)
+      });
+    }
+  }
+  st.rows = dados;
+}
+
+function atualizarFileMeta(tipo){
+  const st = state[tipo];
+  document.getElementById('fname-'+tipo).textContent = st.fileName;
+  document.getElementById('frows-'+tipo).textContent = st.rows.length + ' linha' + (st.rows.length===1?'':'s');
+  document.getElementById('meta-'+tipo).classList.add('show');
+  const cfg = CONFIG_TIPO[tipo];
+  const ok = cfg.obrigatorios.every(k => st.map[k] !== -1) && st.rows.length > 0;
+  document.getElementById('dot-'+tipo).className = 'status-dot ' + (ok ? 'ok' : 'err');
+  document.getElementById('mapwarn-'+tipo).classList.toggle('show', !ok);
+}
+
+function renderizarMapeamento(tipo){
+  const st = state[tipo];
+  const cfg = CONFIG_TIPO[tipo];
+  const wrap = document.getElementById('mapgrid-'+tipo);
+  wrap.innerHTML = '';
+  cfg.campos.forEach(campo => {
+    const isReq = cfg.obrigatorios.includes(campo.key);
+    const field = document.createElement('div');
+    field.className = 'map-field';
+    const label = document.createElement('label');
+    label.innerHTML = ROTULOS_CAMPO[campo.key] + (isReq ? ' <span class="req">*</span>' : ' (opcional)');
+    const select = document.createElement('select');
+    select.dataset.tipo = tipo;
+    select.dataset.campo = campo.key;
+    if(!isReq){
+      const optNone = document.createElement('option');
+      optNone.value = '-1';
+      optNone.textContent = '— nenhuma —';
+      select.appendChild(optNone);
+    }
+    st.headers.forEach((h, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = (h && h.toString().trim() !== '') ? h : ('Coluna ' + (i+1));
+      if(st.map[campo.key] === i) opt.selected = true;
+      select.appendChild(opt);
+    });
+    if(st.map[campo.key] === -1 && !isReq){
+      select.value = '-1';
+    }
+    select.addEventListener('change', function(){
+      state[tipo].map[campo.key] = parseInt(this.value, 10);
+      reconstruirLinhas(tipo);
+      atualizarFileMeta(tipo);
+      atualizarClientesDisponiveis();
+      atualizarCategoriasDisponiveis();
+      atualizarChecklist();
+    });
+    field.appendChild(label);
+    field.appendChild(select);
+    wrap.appendChild(field);
+  });
+  document.getElementById('mapdet-'+tipo).style.display = 'block';
+}
+
+/* ============================================================
+   CLIENTE
+   ============================================================ */
+function atualizarClientesDisponiveis(){
+  const select = document.getElementById('clienteSelect');
+  const valorAtual = select.value;
+  const encontrados = new Map();
+  ['estoque','layout','maestro'].forEach(tipo => {
+    const idx = state[tipo].map.cliente;
+    if(idx === undefined || idx === -1) return;
+    state[tipo].rows.forEach(row => {
+      const original = row.cliente;
+      if(!original) return;
+      const norm = normalizarTexto(original);
+      if(!encontrados.has(norm)) encontrados.set(norm, original);
+    });
+  });
+  state.temColunaCliente = encontrados.size > 0;
+  select.innerHTML = '';
+  if(!state.temColunaCliente){
+    const opt = document.createElement('option');
+    opt.value = '__TODOS__';
+    opt.textContent = state.estoque.rows.length ? 'Todos os dados (sem coluna Cliente)' : '— carregue a base de estoque —';
+    select.appendChild(opt);
+    state.cliente = state.estoque.rows.length ? '__TODOS__' : '';
+  } else {
+    const optPlaceholder = document.createElement('option');
+    optPlaceholder.value = '';
+    optPlaceholder.textContent = 'Selecione um cliente…';
+    select.appendChild(optPlaceholder);
+    Array.from(encontrados.entries()).sort((a,b)=>a[1].localeCompare(b[1])).forEach(([norm, original]) => {
+      const opt = document.createElement('option');
+      opt.value = norm;
+      opt.textContent = original;
+      select.appendChild(opt);
+    });
+    if(Array.from(encontrados.keys()).includes(valorAtual)){
+      select.value = valorAtual;
+      state.cliente = valorAtual;
+    } else {
+      state.cliente = '';
+    }
+  }
+}
+
+/* ============================================================
+   CATEGORIAS (autocomplete para o mapeamento por equipamento)
+   ============================================================ */
+function atualizarCategoriasDisponiveis(){
+  const datalist = document.getElementById('listaCategorias');
+  if(!datalist) return;
+  const encontradas = new Map();
+  ['estoque','maestro'].forEach(tipo => {
+    const idx = state[tipo].map.categoria;
+    if(idx === undefined || idx === -1) return;
+    state[tipo].rows.forEach(row => {
+      const original = row.categoria;
+      if(!original) return;
+      const norm = normalizarTexto(original);
+      if(!encontradas.has(norm)) encontradas.set(norm, original);
+    });
+  });
+  datalist.innerHTML = Array.from(encontradas.values())
+    .sort((a,b) => a.localeCompare(b))
+    .map(v => '<option value="'+escapeHtml(v)+'"></option>')
+    .join('');
+}
+
+/* ============================================================
+   CHECKLIST / VALIDAÇÃO
+   ============================================================ */
+function atualizarChecklist(){
+  const okEstoque = OBRIGATORIOS.estoque.every(k => state.estoque.map[k] !== -1) && state.estoque.rows.length > 0;
+  const okLayout  = OBRIGATORIOS.layout.every(k => state.layout.map[k] !== -1) && state.layout.rows.length > 0;
+  const okMaestro = OBRIGATORIOS.maestro.every(k => state.maestro.map[k] !== -1) && state.maestro.rows.length > 0;
+  const okCliente = !!state.cliente;
+  const okEquipamentos = validarEquipamentos().ok;
+
+  marcarCheck('chk-estoque', okEstoque);
+  marcarCheck('chk-layout', okLayout);
+  marcarCheck('chk-maestro', okMaestro);
+  marcarCheck('chk-cliente', okCliente);
+  marcarCheck('chk-equipamentos', okEquipamentos);
+
+  document.getElementById('btnRodar').disabled = !(okEstoque && okLayout && okMaestro && okCliente && okEquipamentos);
+}
+function marcarCheck(id, ok){
+  const el = document.getElementById(id);
+  el.classList.toggle('done', ok);
+  el.querySelector('.mark').textContent = ok ? '✓' : '✕';
+}
+
+/* ============================================================
+   EQUIPAMENTOS E LIMITES DE AGRUPAMENTO (configurável)
+   ============================================================ */
+const PALETA_EQUIPAMENTOS = ['#0F7A73','#C8791A','#3B7FC4','#8A5CC2','#B24C7B','#4F8A3D','#C24444','#6B6F7A'];
+
+function corEquipamento(idx){
+  return PALETA_EQUIPAMENTOS[idx % PALETA_EQUIPAMENTOS.length];
+}
+
+function validarEquipamentos(){
+  const eqs = state.equipamentos;
+  if(eqs.length === 0) return {ok:false, msg:'Cadastre ao menos um equipamento.'};
+  const padroes = eqs.filter(e => e.padrao);
+  if(padroes.length !== 1) return {ok:false, msg:'Marque exatamente um equipamento como padrão (cobre o restante, até 100%).'};
+  const semNome = eqs.some(e => !e.nome || !e.nome.trim());
+  if(semNome) return {ok:false, msg:'Todo equipamento precisa de um nome.'};
+  const semLimite = eqs.some(e => !e.padrao && !(e.limiteValor > 0));
+  if(semLimite) return {ok:false, msg:'Todo equipamento não-padrão precisa de um limite maior que zero.'};
+  return {ok:true, msg:''};
+}
+
+function adicionarEquipamento(){
+  const n = state.equipamentos.length + 1;
+  state.equipamentos.push({id:'eq'+Date.now(), nome:'L0'+n, limiteTipo:'pct', limiteValor:50, padrao:false, categorias:[]});
+  renderizarEquipamentos();
+  salvarEquipamentosNoServidor();
+}
+
+function removerEquipamento(id){
+  if(state.equipamentos.length <= 1){ alert('É preciso manter ao menos um equipamento cadastrado.'); return; }
+  const removendoPadrao = state.equipamentos.find(e => e.id === id && e.padrao);
+  state.equipamentos = state.equipamentos.filter(e => e.id !== id);
+  if(removendoPadrao && state.equipamentos.length){
+    state.equipamentos[state.equipamentos.length-1].padrao = true;
+  }
+  renderizarEquipamentos();
+  salvarEquipamentosNoServidor();
+}
+
+function marcarPadraoEquipamento(id){
+  state.equipamentos.forEach(e => e.padrao = (e.id === id));
+  renderizarEquipamentos();
+  salvarEquipamentosNoServidor();
+}
+
+function atualizarCampoEquipamento(id, campo, valor){
+  const eq = state.equipamentos.find(e => e.id === id);
+  if(!eq) return;
+  if(campo === 'limiteValor') eq[campo] = paraNumero(valor);
+  else if(campo === 'categorias') eq.categorias = valor.split(',').map(s => s.trim()).filter(s => s !== '');
+  else eq[campo] = valor;
+  atualizarLegendaEquipamentos();
+  atualizarChecklist();
+  salvarEquipamentosNoServidor();
+}
+
+function renderizarEquipamentos(){
+  const corpo = document.getElementById('corpoEquipamentos');
+  corpo.innerHTML = '';
+  state.equipamentos.forEach((eq, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><span class="equip-color-dot" style="background:'+corEquipamento(idx)+';"></span></td>' +
+      '<td><input type="text" value="'+escapeHtml(eq.nome)+'" onchange="atualizarCampoEquipamento(\''+eq.id+'\',\'nome\',this.value)"></td>' +
+      '<td><input type="number" min="0" '+(eq.padrao?'disabled placeholder="—"':'value="'+eq.limiteValor+'"')+' onchange="atualizarCampoEquipamento(\''+eq.id+'\',\'limiteValor\',this.value)"></td>' +
+      '<td><select '+(eq.padrao?'disabled':'')+' onchange="atualizarCampoEquipamento(\''+eq.id+'\',\'limiteTipo\',this.value)">' +
+        '<option value="pct" '+(eq.limiteTipo==='pct'?'selected':'')+'>% de ocupação</option>' +
+        '<option value="unidade" '+(eq.limiteTipo==='unidade'?'selected':'')+'>Unidades</option>' +
+      '</select></td>' +
+      '<td><input type="text" list="listaCategorias" placeholder="Todas as categorias" value="'+escapeHtml((eq.categorias||[]).join(', '))+'" onchange="atualizarCampoEquipamento(\''+eq.id+'\',\'categorias\',this.value)"></td>' +
+      '<td style="text-align:center;"><input type="radio" name="padraoEquip" '+(eq.padrao?'checked':'')+' onchange="marcarPadraoEquipamento(\''+eq.id+'\')"></td>' +
+      '<td><button class="btn ghost sm" onclick="removerEquipamento(\''+eq.id+'\')" title="Remover">✕</button></td>';
+    corpo.appendChild(tr);
+  });
+  atualizarLegendaEquipamentos();
+  atualizarChecklist();
+}
+
+function atualizarLegendaEquipamentos(){
+  const legenda = document.getElementById('equipLegend');
+  legenda.innerHTML = state.equipamentos.map((eq, idx) => {
+    const desc = eq.padrao ? 'padrão — cobre o restante até 100%' : ('até ' + eq.limiteValor + (eq.limiteTipo==='pct' ? '% de ocupação' : ' unidades'));
+    const cat = (eq.categorias && eq.categorias.length) ? ' · categorias: ' + eq.categorias.join(', ') : ' · todas as categorias';
+    const overrideNota = (eq.limiteTipo==='unidade' && eq.categorias && eq.categorias.length) ? ' · define o padrão de pallet (ignora o Maestro)' : '';
+    return '<span class="leg-chip"><span class="leg-dot" style="background:'+corEquipamento(idx)+';"></span>'+escapeHtml(eq.nome)+' · '+desc+escapeHtml(cat)+escapeHtml(overrideNota)+'</span>';
+  }).join('');
+  const val = validarEquipamentos();
+  const warn = document.getElementById('equipWarn');
+  warn.textContent = val.ok ? '' : val.msg;
+  warn.classList.toggle('show', !val.ok);
+}
+
+/* ============================================================
+   MOTOR DE ANÁLISE DE COMPACTAÇÃO
+   ============================================================
+   Regras aplicadas (ajustáveis na aba Parâmetros):
+   1. Agrupa o estoque do cliente selecionado por SKU + LOTE + STATUS.
+   2. Só entram na análise grupos fragmentados em 2+ posições distintas.
+   3. Ordena as posições da maior para a menor quantidade; a posição de
+      maior quantidade é o destino-base. Vai somando, sempre a partir da
+      MENOR quantidade restante, enquanto a soma não ultrapassar 100% da
+      capacidade considerada para o grupo. Essa capacidade normalmente é o
+      padrão de pallet do SKU (Maestro) — EXCETO quando algum equipamento
+      está mapeado com limite em UNIDADES para a categoria do produto: nesse
+      caso o limite do equipamento é que vira a capacidade do grupo, e o
+      padrão do Maestro é desconsiderado (ver equipamentoComCapacidadeEspecifica).
+   4. Se nenhuma posição couber sem estourar 100% da capacidade considerada,
+      o grupo é BLOQUEADO (não deve ser executado).
+   5. Se a soma ultrapassar 100% da capacidade, também é bloqueado. Se o SKU
+      não tiver padrão cadastrado no Maestro E nenhum equipamento tiver
+      limite em unidades mapeado para a categoria do grupo, o grupo fica
+      "sem padrão" e não é processado.
+   6. Para grupos compactáveis, a ocupação final decide o equipamento entre
+      os cadastrados na aba Parâmetros (não são fixos em 3 — o usuário pode
+      cadastrar quantos equipamentos quiser, cada um com limite em % de
+      ocupação ou em unidades). Os equipamentos são ordenados do limite
+      equivalente mais baixo para o mais alto (limites em unidades são
+      convertidos em % usando a capacidade de pallet do próprio SKU) e o
+      primeiro cujo limite comporta a ocupação final é o escolhido; o
+      equipamento marcado como "padrão" não tem limite e serve de rede de
+      segurança, cobrindo o restante até 100%.
+      Se a opção "buscar nova posição" estiver ligada e o destino-base já
+      não for do equipamento desejado, procura uma posição livre (status
+      "E") no Layout com esse equipamento; se não achar, tenta o próximo
+      equipamento na ordem dos limites, até o padrão; senão mantém o
+      destino-base.
+   ============================================================ */
+
+function buscarCapacidadeMaestro(mapaMaestro, sku){
+  return mapaMaestro.get(normalizarTexto(sku));
+}
+
+function construirMapaMaestro(rowsMaestro, cliente){
+  const mapa = new Map();
+  rowsMaestro.forEach(r => {
+    if(!r.sku) return;
+    if(r.cliente && cliente !== '__TODOS__' && normalizarTexto(r.cliente) !== cliente) return;
+    if(!(r.capacidade > 0)) return;
+    mapa.set(normalizarTexto(r.sku), r);
+  });
+  return mapa;
+}
+
+function construirMapaLayout(rowsLayout, cliente){
+  const mapa = new Map();
+  rowsLayout.forEach(r => {
+    if(!r.posicao) return;
+    if(r.cliente && cliente !== '__TODOS__' && normalizarTexto(r.cliente) !== cliente) return;
+    mapa.set(normalizarTexto(r.posicao), r);
+  });
+  return mapa;
+}
+
+function encontrarPosicaoLivre(rowsLayout, equipamento, cliente, reservadas){
+  const alvo = normalizarTexto(equipamento);
+  for(const r of rowsLayout){
+    if(!r.posicao) continue;
+    if(r.cliente && cliente !== '__TODOS__' && normalizarTexto(r.cliente) !== cliente) continue;
+    if(r.equipamento !== alvo) continue;
+    if(r.status !== 'E') continue;
+    const chave = normalizarTexto(r.posicao);
+    if(reservadas.has(chave)) continue;
+    return r;
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------
+   Ordena os equipamentos cadastrados por limite equivalente (%)
+   para um SKU específico (converte limites em unidades para % com
+   base na capacidade de pallet daquele SKU) e escolhe o primeiro
+   cujo limite comporta a ocupação final do grupo. O equipamento
+   padrão nunca tem limite numérico: é sempre o último da fila e
+   sempre serve de rede de segurança (cobre até 100%).
+   ------------------------------------------------------------ */
+function equipamentoAceitaCategoria(eq, categoria){
+  if(!eq.categorias || eq.categorias.length === 0) return true; // sem restrição: aceita qualquer categoria
+  if(!categoria) return false; // equipamento restrito, mas o grupo não tem categoria definida
+  const catNorm = normalizarTexto(categoria);
+  return eq.categorias.some(c => normalizarTexto(c) === catNorm);
+}
+
+/* ------------------------------------------------------------
+   Quando um equipamento está mapeado com limite em UNIDADES para
+   uma categoria específica, esse valor passa a ser o próprio
+   padrão de agrupamento (capacidade do pallet) daquela categoria,
+   desconsiderando a capacidade cadastrada no Maestro. Se houver
+   mais de um equipamento nessas condições para a mesma categoria,
+   usa o de maior limite (o teto do agrupamento).
+   ------------------------------------------------------------ */
+function equipamentoComCapacidadeEspecifica(categoria){
+  if(!categoria) return null;
+  const candidatos = state.equipamentos.filter(eq =>
+    eq.limiteTipo === 'unidade' &&
+    eq.categorias && eq.categorias.length > 0 &&
+    eq.categorias.some(c => normalizarTexto(c) === normalizarTexto(categoria))
+  );
+  if(candidatos.length === 0) return null;
+  return candidatos.reduce((maior, eq) => eq.limiteValor > maior.limiteValor ? eq : maior, candidatos[0]);
+}
+
+function equipamentosOrdenadosParaCapacidade(capacidade, categoria){
+  const compativeis = state.equipamentos.filter(eq => equipamentoAceitaCategoria(eq, categoria));
+  const semCategoriaCompativel = compativeis.length === 0;
+  const base = semCategoriaCompativel ? state.equipamentos : compativeis;
+  const ordenados = base.map(eq => {
+    const equivPct = eq.padrao ? Infinity : (eq.limiteTipo === 'pct' ? eq.limiteValor : (eq.limiteValor / capacidade * 100));
+    return {eq, equivPct};
+  }).sort((a,b) => a.equivPct - b.equivPct);
+  return {ordenados, semCategoriaCompativel};
+}
+
+function escolherEquipamento(ocupacaoFinal, capacidade, categoria){
+  const {ordenados, semCategoriaCompativel} = equipamentosOrdenadosParaCapacidade(capacidade, categoria);
+  for(const item of ordenados){
+    if(ocupacaoFinal <= item.equivPct + 1e-9) return {escolhido:item.eq, ordenados, semCategoriaCompativel};
+  }
+  return {escolhido: ordenados[ordenados.length-1].eq, ordenados, semCategoriaCompativel};
+}
+
+// A partir do equipamento escolhido, procura posição livre nele; se não achar,
+// tenta o próximo da fila (limite equivalente maior), até o padrão.
+function buscarPosicaoComFallback(ordenados, nomeEscolhido, mapaLayoutArr, cliente, reservadas){
+  const idxEscolhido = ordenados.findIndex(o => o.eq.nome === nomeEscolhido);
+  const inicio = idxEscolhido === -1 ? 0 : idxEscolhido;
+  for(let i = inicio; i < ordenados.length; i++){
+    const candidata = encontrarPosicaoLivre(mapaLayoutArr, ordenados[i].eq.nome, cliente, reservadas);
+    if(candidata) return {candidata, tipoUsado: ordenados[i].eq.nome, aplicouFallback: i !== inicio};
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------
+   Consolida TODAS as posições de um grupo (mesmo SKU+Lote+Status),
+   não apenas a maior. Repete o processo "menor absorve na maior"
+   quantas vezes forem necessárias até que toda posição do grupo
+   tenha sido: (a) incorporada a algum pallet consolidado, ou
+   (b) isolada, por não caber junto de nenhuma outra remanescente
+   sem ultrapassar a capacidade do pallet. Retorna uma lista de
+   "pallets" — cada um vira uma linha de resultado própria, então
+   nenhuma posição do grupo original fica de fora do resultado.
+   ------------------------------------------------------------ */
+function consolidarGrupo(posicoes, capacidade){
+  const pool = posicoes.slice();
+  const pallets = [];
+
+  while(pool.length >= 2){
+    pool.sort((a,b) => b.quantidade - a.quantidade);
+    const base = pool.shift(); // maior quantidade remanescente vira base do próximo pallet
+    let acumulado = base.quantidade;
+    const movimentos = [];
+
+    let cabeMais = true;
+    while(cabeMais && pool.length){
+      pool.sort((a,b) => a.quantidade - b.quantidade); // menor primeiro
+      const candidata = pool[0];
+      if(acumulado + candidata.quantidade <= capacidade + 1e-9){
+        movimentos.push(candidata);
+        acumulado += candidata.quantidade;
+        pool.shift();
+      } else {
+        cabeMais = false; // a menor restante não coube: nenhuma outra (maior) também caberia
+      }
+    }
+
+    pallets.push({destinoBase: base, acumulado, movimentos});
+  }
+
+  // sobrou 1 posição sozinha no pool: não tinha ninguém para parear
+  if(pool.length === 1){
+    pallets.push({destinoBase: pool[0], acumulado: pool[0].quantidade, movimentos: []});
+  }
+
+  return pallets;
+}
+
+/* Monta o objeto de resultado para um pallet com ao menos uma junção executável. */
+function montarResultadoCompactar(ctx){
+  const { chave, sku, lote, status, categoria, descricao, capacidade, destinoBase, movimentosOrigem, acumulado, cliente, mapaLayoutArr, reservadas, origemCapacidade, equipCapacidadeEspecifica } = ctx;
+  const ocupacaoFinal = (acumulado / capacidade) * 100;
+  const movimentos = movimentosOrigem.map(p => ({origem:p.posicao, qtd:p.quantidade, statusOrigem:status}));
+
+  const { escolhido: equipamentoDesejado, ordenados: equipamentosOrdenados, semCategoriaCompativel } = escolherEquipamento(ocupacaoFinal, capacidade, categoria);
+  const tipoDesejado = equipamentoDesejado.nome;
+
+  const infoDestinoAtual = mapaLayoutArr.find(r => normalizarTexto(r.posicao) === normalizarTexto(destinoBase.posicao) &&
+    (!r.cliente || cliente==='__TODOS__' || normalizarTexto(r.cliente)===cliente));
+
+  let posicaoDestinoFinal = destinoBase.posicao;
+  let statusDestinoFinal = infoDestinoAtual ? infoDestinoAtual.status : status;
+  let equipamentoFinal = infoDestinoAtual ? infoDestinoAtual.equipamento : tipoDesejado;
+  let observacao = '';
+
+  if(!state.buscarNovaPosicao){
+    observacao = 'Ocupação final ' + ocupacaoFinal.toFixed(1) + '% — sugestão de equipamento ' + tipoDesejado + '. Destino mantido na posição de maior quantidade (busca de nova posição desativada).';
+  } else if(infoDestinoAtual && infoDestinoAtual.equipamento === normalizarTexto(tipoDesejado)){
+    observacao = 'Ocupação final ' + ocupacaoFinal.toFixed(1) + '% — posição de destino já é do equipamento ' + tipoDesejado + '.';
+  } else {
+    const achado = buscarPosicaoComFallback(equipamentosOrdenados, tipoDesejado, mapaLayoutArr, cliente, reservadas);
+    if(achado){
+      reservadas.add(normalizarTexto(achado.candidata.posicao));
+      posicaoDestinoFinal = achado.candidata.posicao;
+      statusDestinoFinal = achado.candidata.status;
+      equipamentoFinal = achado.tipoUsado;
+      observacao = 'Ocupação final ' + ocupacaoFinal.toFixed(1) + '% — novo destino sugerido no equipamento ' + achado.tipoUsado +
+        (achado.aplicouFallback ? ' (sem posição livre em ' + tipoDesejado + ', aplicado fallback de equipamento).' : ' (posição livre, status Vazio, localizada no Layout).');
+    } else {
+      equipamentoFinal = infoDestinoAtual ? infoDestinoAtual.equipamento : tipoDesejado;
+      observacao = 'Ocupação final ' + ocupacaoFinal.toFixed(1) + '% — equipamento desejado ' + tipoDesejado +
+        ', mas nenhuma posição livre (status Vazio) foi localizada em nenhum equipamento configurado. Destino mantido na posição original.';
+    }
+  }
+
+  if(semCategoriaCompativel && categoria){
+    observacao += ' Atenção: nenhum equipamento cadastrado aceita a categoria "' + categoria + '" — foi considerada a lista completa de equipamentos como alternativa. Cadastre um equipamento compatível na aba Parâmetros para um roteamento mais preciso.';
+  }
+
+  if(origemCapacidade === 'equipamento'){
+    observacao += ' Capacidade de agrupamento: ' + capacidade + ' unidades, definida pelo equipamento ' + equipCapacidadeEspecifica.nome + ' para a categoria "' + categoria + '" — o padrão do Maestro foi desconsiderado.';
+  }
+
+  // Se o destino final é uma posição diferente da posição-base (maior quantidade),
+  // a posição-base também precisa ser fisicamente movida para o novo destino.
+  if(normalizarTexto(posicaoDestinoFinal) !== normalizarTexto(destinoBase.posicao)){
+    movimentos.unshift({origem:destinoBase.posicao, qtd:destinoBase.quantidade, statusOrigem:status});
+  }
+
+  return {
+    chave, sku, lote, status, categoria, descricao,
+    posicoesOrigem: [destinoBase, ...movimentosOrigem], qtdTotal: acumulado, capacidade,
+    ocupacaoFinal, acao:'compactar',
+    movimentos, destino:{posicao:posicaoDestinoFinal, status:statusDestinoFinal},
+    equipamento:equipamentoFinal, tipoDesejado,
+    observacao, incluirImpressao:false
+  };
+}
+
+function runAnalysis(){
+  const cliente = state.cliente;
+  if(!cliente){ alert('Selecione um cliente antes de rodar a análise.'); return; }
+
+  const validacaoEquip = validarEquipamentos();
+  if(!validacaoEquip.ok){ alert(validacaoEquip.msg); return; }
+  state.buscarNovaPosicao = document.getElementById('inpBuscarPosicao').checked;
+
+  // 1. Filtra estoque pelo cliente selecionado
+  const estoqueFiltrado = state.estoque.rows.filter(r => {
+    if(cliente === '__TODOS__') return true;
+    if(!r.cliente) return true; // sem coluna cliente: considera tudo
+    return normalizarTexto(r.cliente) === cliente;
+  }).filter(r => r.quantidade > 0 && r.sku && r.posicao);
+
+  // 2. Consolida quantidades por (sku, lote, status, posição) — evita duplicidade
+  //    de linhas para a mesma posição (ex.: múltiplas séries).
+  const porPosicao = new Map();
+  estoqueFiltrado.forEach(r => {
+    const chave = [normalizarTexto(r.sku), normalizarTexto(r.lote), normalizarTexto(r.status), normalizarTexto(r.posicao)].join('|');
+    if(!porPosicao.has(chave)){
+      porPosicao.set(chave, {
+        sku:r.sku, lote:r.lote, status:r.status, posicao:r.posicao,
+        quantidade:0, categoria:r.categoria, descricao:r.descricao
+      });
+    }
+    porPosicao.get(chave).quantidade += r.quantidade;
+  });
+
+  // 3. Agrupa por (sku, lote, status)
+  const grupos = new Map();
+  porPosicao.forEach(item => {
+    const chaveGrupo = [normalizarTexto(item.sku), normalizarTexto(item.lote), normalizarTexto(item.status)].join('|');
+    if(!grupos.has(chaveGrupo)) grupos.set(chaveGrupo, []);
+    grupos.get(chaveGrupo).push(item);
+  });
+
+  const mapaMaestro = construirMapaMaestro(state.maestro.rows, cliente);
+  const mapaLayoutArr = state.layout.rows;
+  const reservadas = new Set(); // posições de layout já sugeridas nesta rodada
+
+  const resultados = [];
+
+  grupos.forEach((posicoes, chaveGrupo) => {
+    if(posicoes.length < 2) return; // já consolidado, nada a fazer
+
+    const [sku, lote, status] = [posicoes[0].sku, posicoes[0].lote, posicoes[0].status];
+    const infoMaestro = buscarCapacidadeMaestro(mapaMaestro, sku);
+    const qtdTotalGrupo = posicoes.reduce((s,p)=>s+p.quantidade, 0);
+    const categoria = (infoMaestro && infoMaestro.categoria) || posicoes[0].categoria || '';
+    const descricao = (infoMaestro && infoMaestro.descricao) || posicoes[0].descricao || '';
+
+    // Se algum equipamento tiver um limite em UNIDADES mapeado especificamente
+    // para a categoria deste grupo, esse valor passa a valer como padrão de
+    // agrupamento — o padrão de pallet cadastrado no Maestro é desconsiderado.
+    const equipCapacidadeEspecifica = equipamentoComCapacidadeEspecifica(categoria);
+    let capacidade, origemCapacidade;
+    if(equipCapacidadeEspecifica){
+      capacidade = equipCapacidadeEspecifica.limiteValor;
+      origemCapacidade = 'equipamento';
+    } else if(infoMaestro){
+      capacidade = infoMaestro.capacidade;
+      origemCapacidade = 'maestro';
+    } else {
+      resultados.push({
+        chave: chaveGrupo, sku, lote, status,
+        posicoesOrigem: posicoes, qtdTotal: qtdTotalGrupo, capacidade: null,
+        ocupacaoFinal: null, acao:'sem_padrao',
+        movimentos: [], destino:null, equipamento:null,
+        observacao:'SKU sem padrão de pallet cadastrado no Maestro e sem equipamento com limite em unidades mapeado para esta categoria.',
+        incluirImpressao:false
+      });
+      return;
+    }
+
+    // Consolida TODAS as posições do grupo — não só a de maior quantidade.
+    // Isso pode gerar vários pallets (várias linhas de resultado) quando o
+    // total do grupo excede muito a capacidade de um único pallet.
+    const pallets = consolidarGrupo(posicoes, capacidade);
+
+    pallets.forEach((pallet, idx) => {
+      const chavePallet = chaveGrupo + '#' + idx;
+      if(pallet.movimentos.length === 0){
+        // esta posição não coube junto de nenhuma outra remanescente do grupo
+        let obsBloqueado = 'Nenhuma outra posição do grupo coube junto desta sem ultrapassar 100% da capacidade do pallet — compactação não deve ser executada.';
+        if(origemCapacidade === 'equipamento'){
+          obsBloqueado += ' Capacidade considerada: ' + capacidade + ' unidades, do equipamento ' + equipCapacidadeEspecifica.nome + ' (mapeado para a categoria "' + categoria + '"), não o padrão do Maestro.';
+        }
+        resultados.push({
+          chave: chavePallet, sku, lote, status, categoria, descricao,
+          posicoesOrigem: [pallet.destinoBase], qtdTotal: pallet.destinoBase.quantidade, capacidade,
+          ocupacaoFinal: (pallet.destinoBase.quantidade/capacidade)*100, acao:'bloqueado',
+          movimentos: [], destino:null, equipamento:null,
+          observacao: obsBloqueado,
+          incluirImpressao:false
+        });
+        return;
+      }
+
+      resultados.push(montarResultadoCompactar({
+        chave: chavePallet, sku, lote, status, categoria, descricao, capacidade,
+        destinoBase: pallet.destinoBase, movimentosOrigem: pallet.movimentos, acumulado: pallet.acumulado,
+        cliente, mapaLayoutArr, reservadas,
+        origemCapacidade, equipCapacidadeEspecifica
+      }));
+    });
+  });
+
+  // Grupos não fragmentados ou sem info suficiente não entram — ordena por ação
+  const ordemAcao = {compactar:0, bloqueado:1, sem_padrao:2};
+  resultados.sort((a,b) => ordemAcao[a.acao]-ordemAcao[b.acao] || a.sku.localeCompare(b.sku));
+
+  state.resultados = resultados;
+  renderizarResultados();
+  mostrarAba('resultados');
+}
+
+/* ============================================================
+   RENDERIZAÇÃO DA ABA RESULTADOS
+   ============================================================ */
+function corOcupacaoPorEquipamento(r){
+  if(r.ocupacaoFinal === null || r.ocupacaoFinal === undefined) return 'var(--ink-soft)';
+  if(r.ocupacaoFinal > 100) return 'var(--danger)';
+  const idx = state.equipamentos.findIndex(eq => eq.nome === r.equipamento);
+  return idx === -1 ? 'var(--ink-soft)' : corEquipamento(idx);
+}
+
+function renderizarResultados(){
+  const resultados = state.resultados;
+  const vazio = document.getElementById('resultadosEmpty');
+  const conteudo = document.getElementById('resultadosConteudo');
+  const badge = document.getElementById('tabBadgeResultados');
+
+  if(resultados.length === 0){
+    vazio.style.display = 'flex';
+    conteudo.style.display = 'none';
+    badge.style.display = 'none';
+    atualizarChipsTopo(0,0,0);
+    return;
+  }
+  vazio.style.display = 'none';
+  conteudo.style.display = 'flex';
+  badge.style.display = 'inline-block';
+  badge.textContent = resultados.length;
+
+  const nCompactar = resultados.filter(r=>r.acao==='compactar').length;
+  const nBloq = resultados.filter(r=>r.acao==='bloqueado').length;
+  const nSemPadrao = resultados.filter(r=>r.acao==='sem_padrao').length;
+
+  document.getElementById('sumGrupos').textContent = resultados.length;
+  document.getElementById('sumCompactar').textContent = nCompactar;
+  document.getElementById('sumBloqueadas').textContent = nBloq;
+  document.getElementById('sumSemPadrao').textContent = nSemPadrao;
+  atualizarChipsTopo(resultados.length, nCompactar, nBloq);
+
+  desenharTabelaResultados();
+}
+
+function atualizarChipsTopo(grupos, compactar, bloq){
+  document.getElementById('chipGrupos').textContent = grupos;
+  document.getElementById('chipCompactar').textContent = compactar;
+  document.getElementById('chipBloq').textContent = bloq;
+}
+
+function filtrarResultados(filtro){
+  state.filtroAtual = filtro;
+  document.querySelectorAll('.chip-filter').forEach(c => c.classList.toggle('active', c.dataset.filtro === filtro));
+  desenharTabelaResultados();
+}
+
+function desenharTabelaResultados(){
+  const corpo = document.getElementById('corpoResultados');
+  corpo.innerHTML = '';
+  const filtro = state.filtroAtual;
+
+  state.resultados.forEach((r, idx) => {
+    if(filtro !== 'todos' && r.acao !== filtro) return;
+
+    const tr = document.createElement('tr');
+    const posicoesHtml = r.posicoesOrigem.map(p => '<span class="pos-tag">'+escapeHtml(p.posicao)+' · '+p.quantidade+'</span>').join(' ');
+
+    let pillAcao, occHtml, equipHtml, destinoHtml;
+    if(r.acao === 'compactar'){
+      pillAcao = '<span class="pill ok">Compactar</span>';
+      const pctShow = r.ocupacaoFinal.toFixed(1);
+      occHtml = '<div class="occ-wrap"><div class="occ-track"><div class="occ-fill" style="width:'+Math.min(r.ocupacaoFinal,100)+'%; background:'+corOcupacaoPorEquipamento(r)+';"></div></div><span class="occ-pct">'+pctShow+'%</span></div>';
+      equipHtml = '<span class="pill equip">'+r.equipamento+'</span>';
+      destinoHtml = '<span class="pos-tag">'+escapeHtml(r.destino.posicao)+'</span>';
+    } else if(r.acao === 'bloqueado'){
+      pillAcao = '<span class="pill block">Bloqueado</span>';
+      const pctShow = r.ocupacaoFinal!==null ? r.ocupacaoFinal.toFixed(1)+'%' : '—';
+      const larguraBloq = r.ocupacaoFinal!==null ? Math.min(r.ocupacaoFinal,100) : 100;
+      occHtml = '<div class="occ-wrap"><div class="occ-track"><div class="occ-fill" style="width:'+larguraBloq+'%; background:var(--danger);"></div></div><span class="occ-pct">'+pctShow+'</span></div>';
+      equipHtml = '—';
+      destinoHtml = '—';
+    } else {
+      pillAcao = '<span class="pill warn">Sem padrão</span>';
+      occHtml = '—';
+      equipHtml = '—';
+      destinoHtml = '—';
+    }
+
+    tr.innerHTML =
+      '<td><button class="row-expand-btn" onclick="alternarDetalhe('+idx+')">▸</button></td>' +
+      '<td class="mono">'+escapeHtml(r.sku)+'</td>' +
+      '<td class="mono">'+escapeHtml(r.lote)+'</td>' +
+      '<td>'+escapeHtml(r.status)+'</td>' +
+      '<td>'+(r.categoria ? '<span class="pos-tag">'+escapeHtml(r.categoria)+'</span>' : '—')+'</td>' +
+      '<td>'+posicoesHtml+'</td>' +
+      '<td class="mono">'+r.qtdTotal+'</td>' +
+      '<td class="mono">'+(r.capacidade!==null?r.capacidade:'—')+'</td>' +
+      '<td>'+occHtml+'</td>' +
+      '<td>'+pillAcao+'</td>' +
+      '<td>'+equipHtml+'</td>' +
+      '<td>'+destinoHtml+'</td>' +
+      '<td class="obs-text">'+escapeHtml(r.observacao)+'</td>' +
+      '<td>'+(r.acao==='compactar' ? '<input type="checkbox" data-idx="'+idx+'" onchange="alternarImpressao('+idx+', this.checked)" '+(r.incluirImpressao?'checked':'')+'>' : '—')+'</td>';
+    corpo.appendChild(tr);
+
+    const trDet = document.createElement('tr');
+    trDet.className = 'detail-row';
+    trDet.id = 'detail-'+idx;
+    let detHtml = '<td colspan="14">';
+    if(r.movimentos.length){
+      detHtml += '<strong>Movimentações sugeridas:</strong><ul class="movs">' +
+        r.movimentos.map(m => '<li>'+escapeHtml(m.origem)+' → '+escapeHtml(r.destino.posicao)+' &nbsp;(qtd. '+m.qtd+')</li>').join('') +
+        '</ul>';
+    } else {
+      detHtml += '<em>Nenhuma movimentação executável para este grupo.</em>';
+    }
+    detHtml += '</td>';
+    trDet.innerHTML = detHtml;
+    corpo.appendChild(trDet);
+  });
+}
+
+function alternarDetalhe(idx){
+  const el = document.getElementById('detail-'+idx);
+  el.classList.toggle('show');
+  const btn = el.previousElementSibling.querySelector('.row-expand-btn');
+  btn.textContent = el.classList.contains('show') ? '▾' : '▸';
+}
+
+function alternarImpressao(idx, checked){
+  state.resultados[idx].incluirImpressao = checked;
+}
+
+function marcarTodosCompactaveis(){
+  state.resultados.forEach(r => { if(r.acao==='compactar') r.incluirImpressao = true; });
+  desenharTabelaResultados();
+}
+
+/* ============================================================
+   EXPORTAÇÃO DO ARQUIVO DE COMPACTAÇÃO SISTÊMICA
+   ============================================================ */
+function montarLinhasExportacao(){
+  const linhas = [];
+  const agora = new Date();
+  const dataStr = agora.toLocaleDateString('pt-BR');
+  state.resultados.filter(r => r.acao === 'compactar').forEach(r => {
+    r.movimentos.forEach(m => {
+      linhas.push({
+        'CLIENTE': document.getElementById('clienteSelect').selectedOptions[0] ? document.getElementById('clienteSelect').selectedOptions[0].textContent : '',
+        'SKU': r.sku,
+        'DESCRICAO': r.descricao || '',
+        'CATEGORIA': r.categoria || '',
+        'LOTE': r.lote,
+        'STATUS': r.status,
+        'POSICAO ORIGEM': m.origem,
+        'QTD MOVIDA': m.qtd,
+        'POSICAO DESTINO': r.destino.posicao,
+        'STATUS DESTINO': r.status,
+        'EQUIPAMENTO DESTINO': r.equipamento,
+        'OCUPACAO FINAL (%)': r.ocupacaoFinal.toFixed(1),
+        'OBSERVACAO': r.observacao,
+        'DATA GERACAO': dataStr
+      });
+    });
+  });
+  return linhas;
+}
+
+function exportarXLSX(){
+  const linhas = montarLinhasExportacao();
+  if(linhas.length === 0){ alert('Não há compactações para exportar. Rode a análise primeiro.'); return; }
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Compactacao');
+  const nomeArq = 'compactacao_sistemica_' + new Date().toISOString().slice(0,10) + '.xlsx';
+  XLSX.writeFile(wb, nomeArq);
+}
+
+function exportarCSV(){
+  const linhas = montarLinhasExportacao();
+  if(linhas.length === 0){ alert('Não há compactações para exportar. Rode a análise primeiro.'); return; }
+  const colunas = Object.keys(linhas[0]);
+  let csv = colunas.join(';') + '\n';
+  linhas.forEach(l => {
+    csv += colunas.map(c => ('"'+(l[c]!==undefined?l[c]:'').toString().replace(/"/g,'""')+'"')).join(';') + '\n';
+  });
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'compactacao_sistemica_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+   FM-EMB23 — IMPRESSÃO
+   ============================================================ */
+function enviarParaImpressao(){
+  const selecionados = state.resultados.filter(r => r.acao === 'compactar' && r.incluirImpressao);
+  if(selecionados.length === 0){
+    alert('Marque ao menos uma compactação na coluna "Imprimir" antes de enviar.');
+    return;
+  }
+  state.fmRows = [];
+  selecionados.forEach(r => {
+    r.movimentos.forEach(m => {
+      state.fmRows.push([
+        m.origem, r.status, r.sku, r.lote, '—', m.qtd, '', r.categoria || '',
+        r.destino.posicao, r.status, ''
+      ]);
+    });
+  });
+  const clienteTexto = document.getElementById('clienteSelect').selectedOptions[0] ? document.getElementById('clienteSelect').selectedOptions[0].textContent : '';
+  document.getElementById('fmCliente').textContent = clienteTexto;
+  montarFmDoc();
+  atualizarDataHoraFm();
+  mostrarAba('impressao');
+}
+
+function montarFmDoc(){
+  const tbl = document.getElementById('fmDataTable');
+  if(state.fmRows.length === 0){
+    tbl.innerHTML = '<tr><td colspan="11" class="fm-empty-msg">Nenhuma compactação enviada ainda — vá até a aba "Resultados", marque as linhas desejadas e clique em "Enviar selecionados → FM-EMB23".</td></tr>';
+    return;
+  }
+  let html = '';
+  state.fmRows.forEach(row => {
+    html += '<tr class="fm-data">' + row.map(v => '<td>'+escapeHtml(v===undefined||v===null?'':v)+'</td>').join('') + '</tr>';
+  });
+  tbl.innerHTML = html;
+}
+
+function limparFm(){
+  state.fmRows = [];
+  montarFmDoc();
+}
+
+function atualizarDataHoraFm(){
+  const agora = new Date();
+  document.getElementById('fmData').textContent = agora.toLocaleDateString('pt-BR');
+  document.getElementById('fmHora').textContent = agora.toLocaleTimeString('pt-BR');
+}
+
+function atualizarCamposFm(){
+  document.getElementById('fmMotivo').textContent = document.getElementById('fmInpMotivo').value;
+  document.getElementById('fmSolicitante').textContent = document.getElementById('fmInpSolicitante').value;
+  document.getElementById('fmDepartamento').textContent = document.getElementById('fmInpDepartamento').value;
+  document.getElementById('fmRespSistemica').textContent = document.getElementById('fmInpRespSistemica').value;
+  document.getElementById('fmRespFisica').textContent = document.getElementById('fmInpRespFisica').value;
+  document.getElementById('fmRespOperacional').textContent = document.getElementById('fmInpRespOperacional').value;
+}
+
+function imprimirFm(){
+  atualizarCamposFm();
+  atualizarDataHoraFm();
+  window.print();
+}
+
+
+function definirLogo(src){
+  const img = document.getElementById('logoImg');
+  const placeholder = document.getElementById('logoPlaceholder');
+  img.src = src;
+  img.style.display = 'block';
+  placeholder.style.display = 'none';
+}
+function carregarLogoUrl(){
+  const url = document.getElementById('logoUrlInput').value.trim();
+  if(!url) return;
+  definirLogo(url);
+}
+function restaurarLogoPadrao(){
+  const img = document.getElementById('logoImg');
+  img.style.display = 'none';
+  img.removeAttribute('src');
+  document.getElementById('logoPlaceholder').style.display = 'block';
+  document.getElementById('logoUrlInput').value = '';
+}
+
+/* ============================================================
+   DRAG & DROP + EVENTOS
+   ============================================================ */
+function configurarDropzone(tipo){
+  const zona = document.getElementById('drop-'+tipo);
+  const input = document.getElementById('file-'+tipo);
+  input.addEventListener('change', e => lerArquivo(tipo, e.target.files[0]));
+  ['dragenter','dragover'].forEach(evt => zona.addEventListener(evt, e => { e.preventDefault(); zona.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(evt => zona.addEventListener(evt, e => { e.preventDefault(); zona.classList.remove('drag'); }));
+  zona.addEventListener('drop', e => {
+    const file = e.dataTransfer.files[0];
+    if(file) lerArquivo(tipo, file);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', async function(){
+  ['estoque','layout','maestro'].forEach(configurarDropzone);
+  document.getElementById('clienteSelect').addEventListener('change', function(){
+    state.cliente = this.value;
+    atualizarChecklist();
+  });
+  await carregarEquipamentosDoServidor();
+  renderizarEquipamentos();
+  document.getElementById('inpBuscarPosicao').addEventListener('change', function(){
+    state.buscarNovaPosicao = this.checked;
+  });
+  document.getElementById('logoFileInput').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => { definirLogo(ev.target.result); };
+    reader.readAsDataURL(file);
+  });
+  ['fmInpMotivo','fmInpSolicitante','fmInpDepartamento','fmInpRespSistemica','fmInpRespFisica','fmInpRespOperacional'].forEach(id => {
+    document.getElementById(id).addEventListener('input', atualizarCamposFm);
+  });
+  restaurarLogoPadrao();
+  atualizarCamposFm();
+  atualizarDataHoraFm();
+  atualizarChecklist();
+});
+</script>
+</body>
+</html>
