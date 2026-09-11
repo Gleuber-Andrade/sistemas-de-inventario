@@ -811,7 +811,8 @@ const SISTEMAS = {
     descricao: 'Consulta de posição, bipagem de série e impressão do FM-EMB23.',
     icone: '🔎',
     cor: 'var(--guarda-red)',
-    arquivo: 'sistema-guarda-de-lentes.html'
+    arquivo: 'sistema-guarda-de-lentes.html',
+    ssoFn: (iframe) => autoLoginGuardaLentes(iframe) // tem cadastro/login próprio
   },
   contagem: {
     titulo: 'Contagem de Estoque',
@@ -819,7 +820,7 @@ const SISTEMAS = {
     icone: '📦',
     cor: 'var(--contagem-blue)',
     arquivo: 'sistema-contagem-estoque.html',
-    sso: true // tem cadastro/login próprio: entra sozinho usando a identidade do portal
+    ssoFn: (iframe) => autoLoginContagem(iframe) // tem cadastro/login próprio
   },
   compactacao: {
     titulo: 'Compactação de Pallets',
@@ -866,12 +867,13 @@ async function abrirSistema(chave){
     return;
   }
 
-  // Alguns sistemas (como o Contagem de Estoque) têm seu próprio
-  // cadastro/login. Para não pedir tudo de novo em cada computador, a gente
-  // tenta entrar automaticamente usando a mesma identidade já logada aqui
-  // no portal, sem precisar aparecer a tela de cadastro dele.
-  if(info.sso){
-    iframe.onload = () => autoLoginContagem(iframe);
+  // Alguns sistemas (como o Guarda de Lentes e o Contagem de Estoque) têm
+  // seu próprio cadastro/login. Para não pedir tudo de novo em cada
+  // computador, a gente tenta entrar automaticamente usando a mesma
+  // identidade já logada aqui no portal, sem precisar aparecer a tela de
+  // cadastro deles.
+  if(info.ssoFn){
+    iframe.onload = () => info.ssoFn(iframe);
   } else {
     iframe.onload = () => mostrarOverlayCarregando(false);
   }
@@ -884,6 +886,28 @@ async function abrirSistema(chave){
 // cadastro próprio (marcados com sso:true acima), sem duplicar cadastro em
 // cada computador/navegador.
 const SSO_SENHA_INTERNA = 'PortalSSO-9f3k2-Inventario';
+
+// Cria uma conta diretamente no Contagem de Estoque com o perfil indicado
+// (sem passar pelo formulário de "primeiro administrador", que sempre cria
+// como admin) e já faz login com ela. Usado tanto para criar o primeiro
+// usuário comum quanto para garantir que um administrador do portal também
+// vire administrador aqui, mesmo que não seja a primeira pessoa a acessar
+// o computador.
+async function criarContaSsoContagem(iwin, perfil){
+  const senhaHash = await iwin.sha256(SSO_SENHA_INTERNA);
+  await iwin.dbPut('usuarios', {
+    nome: usuarioLogado.nome,
+    login: usuarioLogado.login,
+    senhaHash,
+    perfil,
+    podeExtrairRelatorio: perfil === 'admin',
+    ativo: true,
+    criadoEm: new Date().toISOString()
+  });
+  iwin.document.getElementById('loginUser').value = usuarioLogado.login;
+  iwin.document.getElementById('loginPass').value = SSO_SENHA_INTERNA;
+  await iwin.fazerLogin();
+}
 
 async function autoLoginContagem(iframe){
   try{
@@ -921,29 +945,134 @@ async function autoLoginContagem(iframe){
     const jaLogado = appScreen && !appScreen.classList.contains('hidden');
     if(jaLogado){ return; }
 
-    if(usuarios.length === 0){
-      // Primeiro uso neste navegador: cria a conta automaticamente usando o
-      // nome/login do administrador do portal.
-      iwin.document.getElementById('setupNome').value = usuarioLogado.nome;
-      iwin.document.getElementById('setupLogin').value = usuarioLogado.login;
-      iwin.document.getElementById('setupSenha').value = SSO_SENHA_INTERNA;
-      iwin.document.getElementById('setupSenha2').value = SSO_SENHA_INTERNA;
-      await iwin.criarPrimeiroAdmin();
-    } else {
-      // Já existe cadastro (feito antes) mas esta aba/sessão não está
-      // logada: tenta logar automaticamente com o mesmo login do portal.
-      const bate = usuarios.find(u => (u.login||'').trim().toLowerCase() === (usuarioLogado.login||'').trim().toLowerCase());
-      if(bate){
-        iwin.document.getElementById('loginUser').value = usuarioLogado.login;
-        iwin.document.getElementById('loginPass').value = SSO_SENHA_INTERNA;
-        await iwin.fazerLogin();
-      }
-      // Se não bater nenhum usuário (por exemplo, contas criadas manualmente
-      // com senha diferente da interna), simplesmente deixa a tela de login
-      // normal do Contagem de Estoque aparecer — nada quebra.
+    const ehAdminNoPortal = usuarioLogado.perfil === 'admin';
+    const bate = usuarios.find(u => (u.login||'').trim().toLowerCase() === (usuarioLogado.login||'').trim().toLowerCase());
+
+    if(bate){
+      // Já existe uma conta com este login neste computador: só faz login,
+      // sem recriar nem alterar o perfil que já estava salvo.
+      iwin.document.getElementById('loginUser').value = usuarioLogado.login;
+      iwin.document.getElementById('loginPass').value = SSO_SENHA_INTERNA;
+      await iwin.fazerLogin();
+      return;
     }
+
+    if(usuarios.length === 0){
+      // Ninguém cadastrado ainda neste computador. Respeita o MESMO perfil
+      // que a pessoa tem no portal — administrador do portal vira
+      // administrador aqui; usuário comum do portal vira "contador" (nunca
+      // vira administrador só por ser o primeiro a abrir o sistema aqui).
+      if(ehAdminNoPortal){
+        iwin.document.getElementById('setupNome').value = usuarioLogado.nome;
+        iwin.document.getElementById('setupLogin').value = usuarioLogado.login;
+        iwin.document.getElementById('setupSenha').value = SSO_SENHA_INTERNA;
+        iwin.document.getElementById('setupSenha2').value = SSO_SENHA_INTERNA;
+        await iwin.criarPrimeiroAdmin();
+      } else {
+        await criarContaSsoContagem(iwin, 'contador');
+        console.warn('Nenhum administrador foi configurado ainda no Contagem de Estoque deste computador. Peça para um administrador do portal acessar este computador ao menos uma vez.');
+      }
+      return;
+    }
+
+    // Já existem usuários cadastrados neste computador, mas nenhum com este
+    // login. Se quem está logado no portal é administrador, garante que
+    // ele também vire administrador aqui — mesmo que outra pessoa (um
+    // usuário comum) tenha configurado este computador primeiro.
+    if(ehAdminNoPortal){
+      await criarContaSsoContagem(iwin, 'admin');
+    }
+    // Se não é admin e não bateu login, deixa a tela normal de login do
+    // Contagem de Estoque aparecer — nada quebra, a pessoa pode entrar com
+    // uma conta criada manualmente, se houver.
   }catch(err){
     console.warn('Login automático no Contagem de Estoque não foi possível; a tela normal dele vai aparecer.', err);
+  }finally{
+    mostrarOverlayCarregando(false);
+  }
+}
+
+// =========================================================
+// Ponte de login automático (SSO) para o Guarda de Lentes — mesma ideia da
+// ponte do Contagem de Estoque acima, mas usando os nomes de função e o
+// nome do perfil "comum" próprios desse sistema (que são diferentes:
+// dbGetAllUsuarios()/dbPutUsuario() em vez de dbGetAll('usuarios'), e o
+// perfil não-admin se chama "operador", não "contador").
+// =========================================================
+async function criarContaSsoGuardaLentes(iwin, perfil){
+  const senhaHash = await iwin.sha256(SSO_SENHA_INTERNA);
+  await iwin.dbPutUsuario({
+    nome: usuarioLogado.nome,
+    login: usuarioLogado.login,
+    senhaHash,
+    perfil,
+    ativo: true,
+    criadoEm: new Date().toISOString()
+  });
+  iwin.document.getElementById('loginUser').value = usuarioLogado.login;
+  iwin.document.getElementById('loginPass').value = SSO_SENHA_INTERNA;
+  await iwin.fazerLogin();
+}
+
+async function autoLoginGuardaLentes(iframe){
+  try{
+    const iwin = iframe.contentWindow;
+
+    let usuarios = null;
+    for(let tentativa = 0; tentativa < 100; tentativa++){
+      await new Promise(r => setTimeout(r, 300));
+      if(typeof iwin.dbGetAllUsuarios !== 'function') continue;
+      try{
+        usuarios = await iwin.dbGetAllUsuarios();
+        break;
+      }catch(errInterno){
+        // banco interno dele ainda não terminou de abrir — tenta de novo
+      }
+    }
+    if(usuarios === null){
+      console.warn('Login automático no Guarda de Lentes: banco interno não respondeu a tempo (30s). Mostrando tela normal.');
+      return;
+    }
+
+    const appScreen = iwin.document.getElementById('appScreen');
+    const jaLogado = appScreen && !appScreen.classList.contains('hidden');
+    if(jaLogado){ return; }
+
+    const ehAdminNoPortal = usuarioLogado.perfil === 'admin';
+    const bate = usuarios.find(u => (u.login||'').trim().toLowerCase() === (usuarioLogado.login||'').trim().toLowerCase());
+
+    if(bate){
+      iwin.document.getElementById('loginUser').value = usuarioLogado.login;
+      iwin.document.getElementById('loginPass').value = SSO_SENHA_INTERNA;
+      await iwin.fazerLogin();
+      return;
+    }
+
+    if(usuarios.length === 0){
+      // Ninguém cadastrado ainda neste computador. Respeita o mesmo perfil
+      // que a pessoa tem no portal — administrador do portal vira
+      // administrador aqui; usuário comum do portal vira "operador".
+      if(ehAdminNoPortal){
+        iwin.document.getElementById('setupNome').value = usuarioLogado.nome;
+        iwin.document.getElementById('setupLogin').value = usuarioLogado.login;
+        iwin.document.getElementById('setupSenha').value = SSO_SENHA_INTERNA;
+        iwin.document.getElementById('setupSenha2').value = SSO_SENHA_INTERNA;
+        await iwin.criarPrimeiroAdmin();
+      } else {
+        await criarContaSsoGuardaLentes(iwin, 'operador');
+        console.warn('Nenhum administrador foi configurado ainda no Guarda de Lentes deste computador. Peça para um administrador do portal acessar este computador ao menos uma vez.');
+      }
+      return;
+    }
+
+    // Já existem usuários, mas nenhum com este login: se quem está logado
+    // no portal é administrador, garante que ele também vire administrador
+    // aqui, mesmo que outra pessoa tenha configurado o computador primeiro.
+    if(ehAdminNoPortal){
+      await criarContaSsoGuardaLentes(iwin, 'admin');
+    }
+  }catch(err){
+    console.warn('Login automático no Guarda de Lentes não foi possível; a tela normal dele vai aparecer.', err);
   }finally{
     mostrarOverlayCarregando(false);
   }
