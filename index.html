@@ -225,8 +225,6 @@ table.users tr:last-child td{border-bottom:none;}
         <div class="field"><label>Usuário (login)</label><input type="text" id="setupLogin" placeholder="ex: gleuber"></div>
         <div class="field"><label>Senha</label><input type="password" id="setupSenha" placeholder="mínimo 4 caracteres"></div>
         <div class="field"><label>Confirmar senha</label><input type="password" id="setupSenha2" placeholder="repita a senha"></div>
-        <div class="field"><label>Senha mestra de configuração</label><input type="password" id="setupSenhaMestra" placeholder="fornecida só a quem pode administrar"></div>
-        <p class="role-hint">Essa senha mestra é diferente da sua senha de login acima. Ela impede que qualquer pessoa vire administrador só por abrir o painel pela primeira vez em outro computador.</p>
         <button class="btn btn-primary" onclick="criarPrimeiroAdmin()">Criar conta e entrar →</button>
       </div>
     </div>
@@ -426,23 +424,8 @@ function dbPutMemoria(store, obj){
 // compartilhada entre todos os computadores (via o servidor próprio). A
 // sessão de "continuar logado" (store 'config') continua sempre local a
 // cada navegador — não precisa ser compartilhada.
-// Backend próprio do portal (pasta "portal-api/", isolado dos outros
-// sistemas — veja o README dele). Enquanto ele não estiver publicado e
-// ligado aqui, cada computador continua com sua própria lista de usuários
-// (funciona, mas o admin não atravessa de um computador para o outro).
-const PORTAL_API_URL = ''; // <-- preencha com a URL do backend do portal (ex: 'https://portal-api.vilarealfutsal.com.br')
-const PORTAL_API_KEY = ''; // <-- TEM que ser igual ao API_KEY gerado no .env do backend (veja o README dele)
-
-// Senha mestra exigida para criar o administrador do portal (tela "Criar
-// administrador" acima). Sem ela, abrir o portal pela primeira vez em
-// qualquer computador/terminal novo — banco local ainda vazio — NÃO libera
-// mais a criação de uma conta de administrador sozinha: só quem souber esta
-// senha consegue virar admin. É isso que garante um único administrador
-// válido para todos os sistemas, em vez de qualquer pessoa virar admin
-// "local" só por abrir o painel em um computador que nunca usou antes.
-// >>> TROQUE este valor antes de publicar/atualizar no GitHub, e não
-// compartilhe com quem não deve administrar o painel. <<<
-const SETUP_MASTER_SENHA = 'TROQUE-ESTA-SENHA-MESTRA';
+const PORTAL_API_URL = ''; // <-- preencha com a URL do backend do portal (ex: 'https://portal-api.SEUDOMINIO.com')
+const PORTAL_API_KEY = ''; // <-- mesma senha configurada no servidor, se houver
 
 function cabecalhosPortalApi(){
   const h = {'Content-Type':'application/json'};
@@ -507,11 +490,9 @@ async function criarPrimeiroAdmin(){
   const login = document.getElementById('setupLogin').value.trim();
   const senha = document.getElementById('setupSenha').value;
   const senha2 = document.getElementById('setupSenha2').value;
-  const senhaMestra = document.getElementById('setupSenhaMestra').value;
-  if(!nome || !login || !senha || !senhaMestra){ mostrarMsg('setupMsg','Preencha todos os campos.'); return; }
+  if(!nome || !login || !senha){ mostrarMsg('setupMsg','Preencha todos os campos.'); return; }
   if(senha.length < 4){ mostrarMsg('setupMsg','A senha deve ter ao menos 4 caracteres.'); return; }
   if(senha !== senha2){ mostrarMsg('setupMsg','As senhas não conferem.'); return; }
-  if(senhaMestra !== SETUP_MASTER_SENHA){ mostrarMsg('setupMsg','Senha mestra de configuração incorreta. Fale com quem administra o painel.'); return; }
   const senhaHash = await sha256(senha);
   const id = await dbPut('usuarios', {nome, login, senhaHash, perfil:'admin', ativo:true, sistemasPermitidos:Object.keys(SISTEMAS), criadoEm:new Date().toISOString()});
   usuarioLogado = {id, nome, login, perfil:'admin', sistemasPermitidos:Object.keys(SISTEMAS)};
@@ -830,8 +811,7 @@ const SISTEMAS = {
     descricao: 'Consulta de posição, bipagem de série e impressão do FM-EMB23.',
     icone: '🔎',
     cor: 'var(--guarda-red)',
-    arquivo: 'sistema-guarda-de-lentes.html',
-    sso: true // tem cadastro/login próprio: entra sozinho usando a identidade do portal
+    arquivo: 'sistema-guarda-de-lentes.html'
   },
   contagem: {
     titulo: 'Contagem de Estoque',
@@ -891,7 +871,7 @@ async function abrirSistema(chave){
   // tenta entrar automaticamente usando a mesma identidade já logada aqui
   // no portal, sem precisar aparecer a tela de cadastro dele.
   if(info.sso){
-    iframe.onload = () => autoLoginSubSistema(iframe);
+    iframe.onload = () => autoLoginContagem(iframe);
   } else {
     iframe.onload = () => mostrarOverlayCarregando(false);
   }
@@ -902,41 +882,24 @@ async function abrirSistema(chave){
 // Senha interna, nunca mostrada para ninguém — existe só para permitir que
 // o administrador já logado no portal entre automaticamente em sistemas com
 // cadastro próprio (marcados com sso:true acima), sem duplicar cadastro em
-// cada computador/navegador. É por causa desse login automático que existe
-// UM ÚNICO administrador válido para todos os sistemas: cada sistema com
-// sso:true nunca deixa uma pessoa criar seu próprio admin "solto" quando
-// aberto direto (fora do portal) — o admin de cada um só nasce copiado da
-// identidade que já está logada aqui. Usuários comuns continuam sendo
-// cadastrados individualmente dentro do painel de administração de cada
-// sistema, sem relação com este SSO.
+// cada computador/navegador.
 const SSO_SENHA_INTERNA = 'PortalSSO-9f3k2-Inventario';
 
-// Função genérica de login automático (SSO) usada por qualquer sistema
-// marcado com sso:true no objeto SISTEMAS. Os sistemas guardam a lista de
-// usuários de formas ligeiramente diferentes internamente (Contagem de
-// Estoque expõe dbGetAll('usuarios'), Guarda de Lentes expõe
-// dbGetAllUsuarios()) — por isso tenta as duas antes de desistir, em vez de
-// depender do nome de uma função específica.
-async function listarUsuariosInternos(iwin){
-  if(typeof iwin.dbGetAll === 'function') return await iwin.dbGetAll('usuarios');
-  if(typeof iwin.dbGetAllUsuarios === 'function') return await iwin.dbGetAllUsuarios();
-  throw new Error('sistema ainda não expôs sua função de listar usuários');
-}
-
-async function autoLoginSubSistema(iframe){
+async function autoLoginContagem(iframe){
   try{
     const iwin = iframe.contentWindow;
 
     // Espera de forma adaptativa (tenta repetidas vezes) em vez de um tempo
-    // fixo: a inicialização interna de cada sistema pode demorar tempos
-    // diferentes dependendo do computador, e um tempo fixo às vezes não é
-    // suficiente — o que deixava as telas dele travadas, todas escondidas ao
-    // mesmo tempo.
+    // fixo: a inicialização interna do Contagem de Estoque pode demorar
+    // tempos diferentes dependendo do computador, e um tempo fixo às vezes
+    // não é suficiente — o que deixava as telas dele travadas, todas
+    // escondidas ao mesmo tempo.
     let usuarios = null;
     for(let tentativa = 0; tentativa < 20; tentativa++){
       await new Promise(r => setTimeout(r, 250));
+      if(typeof iwin.dbGetAll !== 'function') continue;
       try{
-        usuarios = await listarUsuariosInternos(iwin);
+        usuarios = await iwin.dbGetAll('usuarios');
         break; // conseguiu acessar o banco interno dele, pode seguir
       }catch(errInterno){
         // banco interno dele ainda não terminou de abrir — tenta de novo
@@ -974,10 +937,10 @@ async function autoLoginSubSistema(iframe){
       }
       // Se não bater nenhum usuário (por exemplo, contas criadas manualmente
       // com senha diferente da interna), simplesmente deixa a tela de login
-      // normal do sistema aparecer — nada quebra.
+      // normal do Contagem de Estoque aparecer — nada quebra.
     }
   }catch(err){
-    console.warn('Login automático não foi possível; a tela normal do sistema vai aparecer.', err);
+    console.warn('Login automático no Contagem de Estoque não foi possível; a tela normal dele vai aparecer.', err);
   }finally{
     mostrarOverlayCarregando(false);
   }
