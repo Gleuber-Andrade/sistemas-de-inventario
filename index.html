@@ -973,6 +973,13 @@ async function autoLoginContagem(iframe){
         iwin.document.getElementById('setupSenha').value = SSO_SENHA_INTERNA;
         iwin.document.getElementById('setupSenha2').value = SSO_SENHA_INTERNA;
         await iwin.criarPrimeiroAdmin();
+        // Confirma que realmente entrou — se a validação interna do
+        // formulário rejeitou algo silenciosamente, a tela de cadastro fica
+        // visível sem nunca ter sido enviada de verdade, e sem isso a
+        // gente não saberia o motivo.
+        if(iwin.document.getElementById('appScreen').classList.contains('hidden')){
+          console.error('Login automático no Contagem de Estoque: criarPrimeiroAdmin() rodou mas não entrou no app. nome="' + usuarioLogado.nome + '" login="' + usuarioLogado.login + '"');
+        }
       } else {
         await criarContaSsoContagem(iwin, 'contador');
         console.warn('Nenhum administrador foi configurado ainda no Contagem de Estoque deste computador. Peça para um administrador do portal acessar este computador ao menos uma vez.');
@@ -1066,6 +1073,14 @@ async function autoLoginGuardaLentes(iframe){
         iwin.document.getElementById('setupSenha').value = SSO_SENHA_INTERNA;
         iwin.document.getElementById('setupSenha2').value = SSO_SENHA_INTERNA;
         await iwin.criarPrimeiroAdmin();
+        // Confirma que realmente entrou — se a validação interna do
+        // formulário rejeitou algo silenciosamente (por exemplo um alert()
+        // que não aparece de dentro do iframe), a tela de cadastro fica
+        // visível sem nunca ter sido enviada de verdade, e sem isso a
+        // gente não saberia o motivo.
+        if(iwin.document.getElementById('appScreen').classList.contains('hidden')){
+          console.error('Login automático no Guarda de Lentes: criarPrimeiroAdmin() rodou mas não entrou no app. nome="' + usuarioLogado.nome + '" login="' + usuarioLogado.login + '"');
+        }
       } else {
         await criarContaSsoGuardaLentes(iwin, 'operador');
         console.warn('Nenhum administrador foi configurado ainda no Guarda de Lentes deste computador. Peça para um administrador do portal acessar este computador ao menos uma vez.');
