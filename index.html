@@ -426,8 +426,12 @@ function dbPutMemoria(store, obj){
 // compartilhada entre todos os computadores (via o servidor próprio). A
 // sessão de "continuar logado" (store 'config') continua sempre local a
 // cada navegador — não precisa ser compartilhada.
-const PORTAL_API_URL = ''; // <-- preencha com a URL do backend do portal (ex: 'https://portal-api.SEUDOMINIO.com')
-const PORTAL_API_KEY = ''; // <-- mesma senha configurada no servidor, se houver
+// Backend próprio do portal (pasta "portal-api/", isolado dos outros
+// sistemas — veja o README dele). Enquanto ele não estiver publicado e
+// ligado aqui, cada computador continua com sua própria lista de usuários
+// (funciona, mas o admin não atravessa de um computador para o outro).
+const PORTAL_API_URL = ''; // <-- preencha com a URL do backend do portal (ex: 'https://portal-api.vilarealfutsal.com.br')
+const PORTAL_API_KEY = ''; // <-- TEM que ser igual ao API_KEY gerado no .env do backend (veja o README dele)
 
 // Senha mestra exigida para criar o administrador do portal (tela "Criar
 // administrador" acima). Sem ela, abrir o portal pela primeira vez em
@@ -438,7 +442,7 @@ const PORTAL_API_KEY = ''; // <-- mesma senha configurada no servidor, se houver
 // "local" só por abrir o painel em um computador que nunca usou antes.
 // >>> TROQUE este valor antes de publicar/atualizar no GitHub, e não
 // compartilhe com quem não deve administrar o painel. <<<
-const SETUP_MASTER_SENHA = 'Opala77@2026';
+const SETUP_MASTER_SENHA = 'TROQUE-ESTA-SENHA-MESTRA';
 
 function cabecalhosPortalApi(){
   const h = {'Content-Type':'application/json'};
