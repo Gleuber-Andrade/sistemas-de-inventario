@@ -890,24 +890,27 @@ async function autoLoginContagem(iframe){
     const iwin = iframe.contentWindow;
 
     // Espera de forma adaptativa (tenta repetidas vezes) em vez de um tempo
-    // fixo: a inicialização interna do Contagem de Estoque pode demorar
-    // tempos diferentes dependendo do computador, e um tempo fixo às vezes
-    // não é suficiente — o que deixava as telas dele travadas, todas
-    // escondidas ao mesmo tempo.
+    // fixo: a inicialização interna do Contagem de Estoque depende de
+    // carregar bibliotecas externas (leitor de câmera, planilhas) antes de
+    // conseguir abrir seu banco de dados — em uma rede mais lenta ou no
+    // primeiro carregamento num computador novo, isso pode demorar mais que
+    // alguns segundos. Por isso tentamos por até 30 segundos antes de
+    // desistir, em vez de um tempo curto fixo.
     let usuarios = null;
-    for(let tentativa = 0; tentativa < 20; tentativa++){
-      await new Promise(r => setTimeout(r, 250));
+    for(let tentativa = 0; tentativa < 100; tentativa++){
+      await new Promise(r => setTimeout(r, 300));
       if(typeof iwin.dbGetAll !== 'function') continue;
       try{
         usuarios = await iwin.dbGetAll('usuarios');
         break; // conseguiu acessar o banco interno dele, pode seguir
       }catch(errInterno){
-        // banco interno dele ainda não terminou de abrir — tenta de novo
+        // ainda não terminou de abrir — tenta de novo
       }
     }
     if(usuarios === null){
-      // Depois de 5 segundos tentando, desiste e deixa a tela normal do
+      // Depois de 30 segundos tentando, desiste e deixa a tela normal do
       // sistema aparecer sozinha (mais seguro que travar escondido).
+      console.warn('Login automático no Contagem de Estoque: banco interno não respondeu a tempo (30s). Mostrando tela normal.');
       return;
     }
 
