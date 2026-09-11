@@ -910,6 +910,11 @@ async function criarContaSsoContagem(iwin, perfil){
 }
 
 async function autoLoginContagem(iframe){
+  // Trava contra reentrância: se o evento "load" do iframe disparar mais de
+  // uma vez (acontece às vezes com srcdoc), impede que esta ponte rode
+  // duas vezes ao mesmo tempo — o que deixava a tela de cadastro "grudada"
+  // até sair e entrar de novo no sistema.
+  iframe.onload = null;
   try{
     const iwin = iframe.contentWindow;
 
@@ -1015,6 +1020,9 @@ async function criarContaSsoGuardaLentes(iwin, perfil){
 }
 
 async function autoLoginGuardaLentes(iframe){
+  // Mesma trava contra reentrância do Contagem de Estoque (ver comentário
+  // acima) — evita rodar esta ponte duas vezes ao mesmo tempo.
+  iframe.onload = null;
   try{
     const iwin = iframe.contentWindow;
 
