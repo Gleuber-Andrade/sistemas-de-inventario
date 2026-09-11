@@ -121,6 +121,17 @@ footer{text-align:center; padding:20px; color:#98a2b3; font-size:0.8rem;}
   </div>
 </div>
 
+<!-- ===================== ACESSO BLOQUEADO: aberto direto, fora do portal, sem nenhum usuário ===================== -->
+<div id="bloqueadoScreen" class="hidden">
+  <div class="login-wrap">
+    <div class="login-card">
+      <h2>🔒 Acesso pelo portal necessário</h2>
+      <p class="muted center">Este sistema ainda não tem nenhum usuário cadastrado neste computador.</p>
+      <p class="muted center">Para manter um único administrador válido para todos os sistemas, o primeiro acesso não pode ser feito abrindo este arquivo direto. Peça para abrir pelo portal <strong>Sistemas do Inventário</strong> — o administrador é criado automaticamente por lá.</p>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== TELA DE LOGIN ===================== -->
 <div id="loginScreen" class="hidden">
   <div class="login-wrap">
@@ -706,7 +717,23 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   await abrirBanco();
   const usuarios = await dbGetAll('usuarios');
   if(usuarios.length === 0){
-    document.getElementById('setupScreen').classList.remove('hidden');
+    if(window.self !== window.top){
+      // Rodando dentro do portal "Sistemas do Inventário" (iframe): o
+      // próprio portal detecta que ainda não há administrador aqui e cria
+      // um automaticamente, copiando a identidade de quem já está logado
+      // lá (login automático/SSO) — por isso a tela de setup ainda aparece,
+      // só que preenchida e enviada por script, sem intervenção manual.
+      document.getElementById('setupScreen').classList.remove('hidden');
+    } else {
+      // Aberto direto (fora do portal) e ainda sem nenhum usuário cadastrado
+      // neste computador: NÃO libera mais a criação de administrador por
+      // aqui. Antes, isso permitia que qualquer pessoa, em qualquer
+      // computador/terminal novo, criasse seu próprio administrador "solto"
+      // para este sistema — quebrando a regra de ter um único administrador
+      // válido para todos os sistemas. Agora o primeiro administrador só
+      // pode ser provisionado abrindo este sistema através do portal.
+      document.getElementById('bloqueadoScreen').classList.remove('hidden');
+    }
     return;
   }
   const restaurado = await restaurarSessao();
