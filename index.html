@@ -424,7 +424,7 @@ function dbPutMemoria(store, obj){
 // compartilhada entre todos os computadores (via o servidor próprio). A
 // sessão de "continuar logado" (store 'config') continua sempre local a
 // cada navegador — não precisa ser compartilhada.
-const PORTAL_API_URL = 'https://portal-api.vilarealfutsal.com.br'; // <-- preencha com a URL do backend do portal (ex: 'https://portal-api.SEUDOMINIO.com')
+const PORTAL_API_URL = ''; // <-- preencha com a URL do backend do portal (ex: 'https://portal-api.SEUDOMINIO.com')
 const PORTAL_API_KEY = ''; // <-- mesma senha configurada no servidor, se houver
 
 function cabecalhosPortalApi(){
@@ -887,21 +887,36 @@ const SSO_SENHA_INTERNA = 'PortalSSO-9f3k2-Inventario';
 
 async function autoLoginContagem(iframe){
   try{
-    // Dá tempo da inicialização interna do Contagem de Estoque terminar
-    // (ela roda de forma assíncrona; agir cedo demais faz a tentativa de
-    // login automático ser sobrescrita pela tela inicial dele).
-    await new Promise(r => setTimeout(r, 1500));
-    const iwin = iframe.contentWindow; // pega a referência só depois da espera
-    if(typeof iwin.dbGetAll !== 'function'){ mostrarOverlayCarregando(false); return; }
+    const iwin = iframe.contentWindow;
+
+    // Espera de forma adaptativa (tenta repetidas vezes) em vez de um tempo
+    // fixo: a inicialização interna do Contagem de Estoque pode demorar
+    // tempos diferentes dependendo do computador, e um tempo fixo às vezes
+    // não é suficiente — o que deixava as telas dele travadas, todas
+    // escondidas ao mesmo tempo.
+    let usuarios = null;
+    for(let tentativa = 0; tentativa < 20; tentativa++){
+      await new Promise(r => setTimeout(r, 250));
+      if(typeof iwin.dbGetAll !== 'function') continue;
+      try{
+        usuarios = await iwin.dbGetAll('usuarios');
+        break; // conseguiu acessar o banco interno dele, pode seguir
+      }catch(errInterno){
+        // banco interno dele ainda não terminou de abrir — tenta de novo
+      }
+    }
+    if(usuarios === null){
+      // Depois de 5 segundos tentando, desiste e deixa a tela normal do
+      // sistema aparecer sozinha (mais seguro que travar escondido).
+      return;
+    }
 
     // Variáveis internas dele (como usuarioLogado) não ficam acessíveis por
     // fora do iframe, então checamos pelo elemento que ele próprio usa para
     // mostrar a tela principal (perde a classe "hidden" só após login).
     const appScreen = iwin.document.getElementById('appScreen');
     const jaLogado = appScreen && !appScreen.classList.contains('hidden');
-    if(jaLogado){ mostrarOverlayCarregando(false); return; }
-
-    const usuarios = await iwin.dbGetAll('usuarios');
+    if(jaLogado){ return; }
 
     if(usuarios.length === 0){
       // Primeiro uso neste navegador: cria a conta automaticamente usando o

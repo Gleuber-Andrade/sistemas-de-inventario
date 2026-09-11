@@ -520,7 +520,7 @@ footer{text-align:center; padding:20px; color:#98a2b3; font-size:0.8rem;}
    ========================================================================= */
 
 const DB_NAME = 'ContagemEstoqueDB';
-const DB_VERSION = 2;
+const DB_VERSION = 4; // aumentado por causa de um conflito de versão (alguns navegadores já tinham uma versão 3 salva de testes anteriores)
 let db = null;
 
 function abrirBanco(){
@@ -549,7 +549,7 @@ function abrirBanco(){
 // tabela de usuários fica de fora de propósito — ela já é resolvida pelo
 // login automático (SSO) com o Portal.
 // =========================================================
-const CONTAGEM_API_URL = 'https://contagem-api.vilarealfutsal.com.br'; // <-- preencha com a URL do backend (ex: 'https://contagem-api.SEUDOMINIO.com')
+const CONTAGEM_API_URL = ''; // <-- preencha com a URL do backend (ex: 'https://contagem-api.SEUDOMINIO.com')
 const CONTAGEM_API_KEY = ''; // <-- mesma senha configurada no servidor, se houver
 const LOJAS_CENTRALIZADAS = ['layout', 'baseSistema', 'contagens', 'recontagem'];
 
