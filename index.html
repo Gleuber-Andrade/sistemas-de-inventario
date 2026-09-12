@@ -433,9 +433,28 @@ function cabecalhosPortalApi(){
   return h;
 }
 
+// O túnel do Cloudflare reconecta periodicamente (é normal), e uma chamada
+// que aconteça bem nesse instante pode falhar com "Failed to fetch" mesmo
+// com o servidor funcionando perfeitamente. Em vez de mostrar erro pro
+// usuário na primeira falha, tenta mais 2 vezes com uma pausa curta antes
+// de desistir de verdade.
+async function fetchComRetentativa(url, opcoes, tentativas){
+  tentativas = tentativas || 3;
+  let ultimoErro;
+  for(let i = 0; i < tentativas; i++){
+    try{
+      return await fetch(url, opcoes);
+    }catch(err){
+      ultimoErro = err;
+      if(i < tentativas - 1) await new Promise(r => setTimeout(r, 600));
+    }
+  }
+  throw ultimoErro;
+}
+
 async function dbGetAll(store){
   if(store === 'usuarios' && PORTAL_API_URL){
-    const resp = await fetch(PORTAL_API_URL + '/usuarios', {headers: cabecalhosPortalApi()});
+    const resp = await fetchComRetentativa(PORTAL_API_URL + '/usuarios', {headers: cabecalhosPortalApi()});
     if(!resp.ok) throw new Error('Erro ao buscar usuários no servidor (HTTP ' + resp.status + ').');
     return await resp.json();
   }
@@ -443,7 +462,7 @@ async function dbGetAll(store){
 }
 async function dbGet(store, key){
   if(store === 'usuarios' && PORTAL_API_URL){
-    const resp = await fetch(PORTAL_API_URL + '/usuarios/' + key, {headers: cabecalhosPortalApi()});
+    const resp = await fetchComRetentativa(PORTAL_API_URL + '/usuarios/' + key, {headers: cabecalhosPortalApi()});
     if(resp.status === 404) return null;
     if(!resp.ok) throw new Error('Erro ao buscar usuário no servidor (HTTP ' + resp.status + ').');
     return await resp.json();
@@ -452,7 +471,7 @@ async function dbGet(store, key){
 }
 async function dbPut(store, obj){
   if(store === 'usuarios' && PORTAL_API_URL){
-    const resp = await fetch(PORTAL_API_URL + '/usuarios', {
+    const resp = await fetchComRetentativa(PORTAL_API_URL + '/usuarios', {
       method: 'POST', headers: cabecalhosPortalApi(), body: JSON.stringify(obj)
     });
     if(!resp.ok) throw new Error('Erro ao salvar usuário no servidor (HTTP ' + resp.status + ').');
@@ -904,6 +923,14 @@ async function criarContaSsoContagem(iwin, perfil){
     ativo: true,
     criadoEm: new Date().toISOString()
   });
+  // Esconde a tela de "criar administrador" (ela tinha sido mostrada pelo
+  // próprio sistema, que detectou zero usuários, antes desta ponte
+  // conseguir agir) — sem isso, ela ficava aberta por cima da tela
+  // principal mesmo depois do login funcionar.
+  ['setupScreen','loginScreen','recuperarSenhaScreen'].forEach(id => {
+    const el = iwin.document.getElementById(id);
+    if(el) el.classList.add('hidden');
+  });
   iwin.document.getElementById('loginUser').value = usuarioLogado.login;
   iwin.document.getElementById('loginPass').value = SSO_SENHA_INTERNA;
   await iwin.fazerLogin();
@@ -1020,6 +1047,14 @@ async function criarContaSsoGuardaLentes(iwin, perfil){
     perfil,
     ativo: true,
     criadoEm: new Date().toISOString()
+  });
+  // Esconde a tela de "criar administrador" (ela tinha sido mostrada pelo
+  // próprio sistema, que detectou zero usuários, antes desta ponte
+  // conseguir agir) — sem isso, ela ficava aberta por cima da tela
+  // principal mesmo depois do login funcionar.
+  ['setupScreen','loginScreen','bloqueadoScreen','recuperarSenhaScreen'].forEach(id => {
+    const el = iwin.document.getElementById(id);
+    if(el) el.classList.add('hidden');
   });
   iwin.document.getElementById('loginUser').value = usuarioLogado.login;
   iwin.document.getElementById('loginPass').value = SSO_SENHA_INTERNA;
