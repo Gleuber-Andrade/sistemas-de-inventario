@@ -195,6 +195,12 @@ footer{text-align:center; padding:20px; color:#98a2b3; font-size:0.8rem;}
         <!-- STEP 1: POSIÇÃO -->
         <div id="stepPosicao">
           <div id="reconIndicadorBox" class="position-info hidden" style="background:#fff8e1; border-left:4px solid #f0ad4e;"></div>
+          <div class="field" id="wrapClienteConversao" style="max-width:420px;">
+            <label>Cliente <span class="tag-free">para conversão automática de SKU ao bipar (opcional)</span></label>
+            <select id="selClienteConversao" onchange="onMudarClienteConversao()">
+              <option value="">-- Nenhum (não converter SKU) --</option>
+            </select>
+          </div>
           <div class="field">
             <label>Bipe ou digite a POSIÇÃO e pressione Enter</label>
             <div class="scan-input-group">
@@ -240,7 +246,8 @@ footer{text-align:center; padding:20px; color:#98a2b3; font-size:0.8rem;}
             <div class="field">
               <label>SKU</label>
               <input type="text" id="inputSku" placeholder="Código do produto"
-                onfocus="setCampoAtivo('inputSku')" onkeydown="if(event.key==='Enter'){event.preventDefault(); document.getElementById('inputLote').focus();}">
+                onfocus="setCampoAtivo('inputSku')" onkeydown="if(event.key==='Enter'){event.preventDefault(); onEnterCampoSku();}"
+                onblur="aplicarConversaoSkuNoCampo()">
             </div>
             <div class="field">
               <label>Lote</label>
@@ -367,6 +374,27 @@ footer{text-align:center; padding:20px; color:#98a2b3; font-size:0.8rem;}
         <input type="file" id="fileBaseSistema" accept=".xlsx,.xls" style="display:none" onchange="carregarBaseSistema(event)">
         <button class="btn" onclick="document.getElementById('fileBaseSistema').click()">📂 Carregar / Substituir Base do Sistema (.xlsx)</button>
         <button class="btn danger" onclick="limparBaseSistema()">Limpar Base do Sistema</button>
+      </div>
+
+      <div class="card">
+        <h2>Conversão de SKU por Cliente (Maestro)</h2>
+        <p class="muted">Carregue, para cada cliente, a planilha "maestro" de conversão de código (colunas: <b>Part-Number</b> = código do cliente, <b>Codigo</b> = SKU do sistema). Durante a bipagem, o contador seleciona o cliente e, ao bipar/digitar o SKU, o sistema busca o código bipado na coluna Part-Number e SUBSTITUI automaticamente o campo pelo SKU do sistema (coluna Codigo) quando encontrar correspondência. Linhas com Part-Number em branco são ignoradas (não geram conversão).</p>
+        <div class="row" style="align-items:flex-end;">
+          <div class="field" style="max-width:320px;">
+            <label>Nome do Cliente</label>
+            <input type="text" id="inputNomeClienteMaestro" placeholder="Ex: TECNOSET">
+          </div>
+          <div class="field" style="max-width:320px;">
+            <input type="file" id="fileMaestroConversao" accept=".xlsx,.xls" style="display:none" onchange="carregarMaestroConversao(event)">
+            <button class="btn" onclick="prepararUploadMaestroConversao()">📂 Carregar Maestro do Cliente (.xlsx)</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Cliente</th><th>Códigos Mapeados</th><th>Última Atualização</th><th></th></tr></thead>
+            <tbody id="tabelaMaestroConversao"></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="card">
@@ -520,7 +548,7 @@ footer{text-align:center; padding:20px; color:#98a2b3; font-size:0.8rem;}
    ========================================================================= */
 
 const DB_NAME = 'ContagemEstoqueDB';
-const DB_VERSION = 4; // aumentado por causa de um conflito de versão (alguns navegadores já tinham uma versão 3 salva de testes anteriores)
+const DB_VERSION = 3;
 let db = null;
 
 function abrirBanco(){
@@ -535,38 +563,17 @@ function abrirBanco(){
       if(!d.objectStoreNames.contains('config')) d.createObjectStore('config', {keyPath:'chave'});
       // v2: lista de recontagem (2ª contagem apenas das posições que apresentaram divergência no confronto)
       if(!d.objectStoreNames.contains('recontagem')) d.createObjectStore('recontagem', {keyPath:'posicao'});
+      // v3: maestro de conversão de SKU por cliente — cada registro é um cliente,
+      // com um mapa {skuClienteNormalizado: {codigo, descricao}} carregado de uma
+      // planilha própria daquele cliente (colunas: Part-Number / Codigo).
+      if(!d.objectStoreNames.contains('maestroConversao')) d.createObjectStore('maestroConversao', {keyPath:'cliente'});
     };
     req.onsuccess = function(ev){ db = ev.target.result; resolve(db); };
     req.onerror = function(ev){ reject(ev.target.error); };
   });
 }
 
-// =========================================================
-// Sincronização com o servidor próprio (opcional) — se CONTAGEM_API_URL
-// ficar em branco, o sistema continua funcionando 100% local, exatamente
-// como antes. Preenchendo, estas 4 "gavetas" passam a ser compartilhadas
-// entre computadores: layout, baseSistema, contagens e recontagem. A
-// tabela de usuários fica de fora de propósito — ela já é resolvida pelo
-// login automático (SSO) com o Portal.
-// =========================================================
-const CONTAGEM_API_URL = 'https://contagem-api.vilarealfutsal.com.br'; // <-- preencha com a URL do backend (ex: 'https://contagem-api.SEUDOMINIO.com')
-const CONTAGEM_API_KEY = ''; // <-- mesma senha configurada no servidor, se houver
-const LOJAS_CENTRALIZADAS = ['layout', 'baseSistema', 'contagens', 'recontagem'];
-
-function cabecalhosContagemApi(){
-  const h = {'Content-Type':'application/json'};
-  if(CONTAGEM_API_KEY) h['Authorization'] = 'Bearer ' + CONTAGEM_API_KEY;
-  return h;
-}
-function usaServidorContagem(storeName){
-  return !!CONTAGEM_API_URL && LOJAS_CENTRALIZADAS.includes(storeName);
-}
-
 function dbGetAll(storeName){
-  if(usaServidorContagem(storeName)){
-    return fetch(CONTAGEM_API_URL + '/registros/' + storeName, {headers: cabecalhosContagemApi()})
-      .then(resp => { if(!resp.ok) throw new Error('Erro ao buscar ' + storeName + ' no servidor (HTTP ' + resp.status + ').'); return resp.json(); });
-  }
   return new Promise((resolve, reject)=>{
     const tx = db.transaction(storeName, 'readonly');
     const req = tx.objectStore(storeName).getAll();
@@ -575,14 +582,6 @@ function dbGetAll(storeName){
   });
 }
 function dbGet(storeName, key){
-  if(usaServidorContagem(storeName)){
-    return fetch(CONTAGEM_API_URL + '/registros/' + storeName + '/' + encodeURIComponent(key), {headers: cabecalhosContagemApi()})
-      .then(resp => {
-        if(resp.status === 404) return null;
-        if(!resp.ok) throw new Error('Erro ao buscar registro no servidor (HTTP ' + resp.status + ').');
-        return resp.json();
-      });
-  }
   return new Promise((resolve, reject)=>{
     const tx = db.transaction(storeName, 'readonly');
     const req = tx.objectStore(storeName).get(key);
@@ -591,20 +590,6 @@ function dbGet(storeName, key){
   });
 }
 function dbPut(storeName, obj){
-  if(usaServidorContagem(storeName)){
-    return fetch(CONTAGEM_API_URL + '/registros/' + storeName, {
-      method:'POST', headers: cabecalhosContagemApi(), body: JSON.stringify(obj)
-    }).then(resp => {
-      if(!resp.ok) throw new Error('Erro ao salvar no servidor (HTTP ' + resp.status + ').');
-      return resp.json();
-    }).then(salvo => {
-      // Se o objeto original não tinha id (registro novo com autoIncrement),
-      // o servidor gerou um id novo — refletimos no objeto local, igual o
-      // IndexedDB faria.
-      if(salvo && salvo.id !== undefined) obj.id = salvo.id;
-      return salvo.chave !== undefined ? salvo.chave : salvo.id;
-    });
-  }
   return new Promise((resolve, reject)=>{
     const tx = db.transaction(storeName, 'readwrite');
     const req = tx.objectStore(storeName).put(obj);
@@ -621,11 +606,6 @@ function dbDelete(storeName, key){
   });
 }
 function dbClear(storeName){
-  if(usaServidorContagem(storeName)){
-    return fetch(CONTAGEM_API_URL + '/registros/' + storeName, {
-      method:'DELETE', headers: cabecalhosContagemApi()
-    }).then(resp => { if(!resp.ok) throw new Error('Erro ao limpar no servidor (HTTP ' + resp.status + ').'); });
-  }
   return new Promise((resolve, reject)=>{
     const tx = db.transaction(storeName, 'readwrite');
     const req = tx.objectStore(storeName).clear();
@@ -634,11 +614,6 @@ function dbClear(storeName){
   });
 }
 function dbBulkPut(storeName, arr){
-  if(usaServidorContagem(storeName)){
-    return fetch(CONTAGEM_API_URL + '/registros/' + storeName + '/bulk', {
-      method:'POST', headers: cabecalhosContagemApi(), body: JSON.stringify(arr)
-    }).then(resp => { if(!resp.ok) throw new Error('Erro ao salvar em lote no servidor (HTTP ' + resp.status + ').'); });
-  }
   return new Promise((resolve, reject)=>{
     const tx = db.transaction(storeName, 'readwrite');
     const store = tx.objectStore(storeName);
@@ -667,41 +642,6 @@ function formatarDataHora(iso){
 function normalizar(s){
   return (s===undefined || s===null) ? '' : String(s).trim().toUpperCase();
 }
-
-// =========================================================
-// "Olho mágico" — adiciona um botão de mostrar/ocultar em todo campo de
-// senha da página automaticamente, sem precisar mexer em cada campo um
-// por um. Roda uma vez, quando a página termina de carregar.
-// =========================================================
-function adicionarOlhoMagicoSenhas(){
-  document.querySelectorAll('input[type="password"]').forEach(input => {
-    if(input.dataset.olhoMagico) return; // já tem, não duplica
-    input.dataset.olhoMagico = '1';
-
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'position:relative; display:flex; align-items:center; width:100%;';
-    input.parentNode.insertBefore(wrapper, input);
-    wrapper.appendChild(input);
-    input.style.paddingRight = '38px';
-    input.style.width = '100%';
-    input.style.boxSizing = 'border-box';
-
-    const botao = document.createElement('button');
-    botao.type = 'button';
-    botao.textContent = '👁️';
-    botao.title = 'Mostrar/ocultar senha';
-    botao.style.cssText = 'position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1rem; padding:4px; line-height:1; opacity:0.65;';
-    botao.onmouseenter = () => botao.style.opacity = '1';
-    botao.onmouseleave = () => botao.style.opacity = '0.65';
-    botao.onclick = () => {
-      const mostrando = input.type === 'text';
-      input.type = mostrando ? 'password' : 'text';
-      botao.textContent = mostrando ? '👁️' : '🙈';
-    };
-    wrapper.appendChild(botao);
-  });
-}
-document.addEventListener('DOMContentLoaded', adicionarOlhoMagicoSenhas);
 // Normaliza uma POSIÇÃO para fins de COMPARAÇÃO/BUSCA (nunca para exibição):
 // além do trim+maiúsculas do normalizar(), remove os traços "-", para que o
 // sistema reconheça a mesma posição informada COM ou SEM os traços separadores
@@ -855,7 +795,7 @@ async function salvarNovaSenhaRecuperacao(){
   setTimeout(()=> document.getElementById('loginPass')?.focus(), 50);
 }
 
-function entrarNoApp(){
+async function entrarNoApp(){
   document.getElementById('hdrNome').textContent = usuarioLogado.nome;
   const badge = document.getElementById('hdrPerfil');
   badge.textContent = usuarioLogado.perfil === 'admin' ? 'Administrador' : 'Contador';
@@ -863,7 +803,12 @@ function entrarNoApp(){
   aplicarPermissoesNav();
   document.getElementById('appScreen').classList.remove('hidden');
   mostrarAba('contagem');
-  atualizarPainelBases();
+  // Restaura o cliente de conversão de SKU selecionado da última sessão (persiste
+  // entre posições e reinícios do app, já que normalmente é o mesmo cliente durante
+  // todo o turno de contagem).
+  const cfgCliente = await dbGet('config', 'clienteConversaoSelecionado');
+  clienteConversaoAtual = (cfgCliente && cfgCliente.valor) || '';
+  await atualizarPainelBases();
   resetarFluxoContagem();
 }
 
@@ -1092,6 +1037,13 @@ function onScanSuccess(decodedText, resultado){
   let ehGS1 = false;
   if(['inputSku','inputLote','inputSerie'].includes(campoAtivo)){
     ehGS1 = tentarDecompoGS1(decodedText);
+  }
+  // Conversão de SKU por cliente: se o campo bipado foi o SKU (diretamente ou
+  // preenchido pelo AI(01) de um GS1-128), confere o valor lido contra o
+  // maestro do cliente selecionado e substitui pelo SKU do sistema quando houver
+  // correspondência (ver aplicarConversaoSkuNoCampo()).
+  if(campoAtivo === 'inputSku' || ehGS1){
+    aplicarConversaoSkuNoCampo();
   }
   // Se o campo em foco for a Série e o código não for um GS1-128 reconhecido,
   // aplica a fórmula de extração de serial pelo tamanho do código lido — e,
@@ -1697,7 +1649,6 @@ async function carregarTabelaUsuarios(){
       <td>
         <button class="btn secondary small" onclick="editarUsuario(${u.id})">Editar</button>
         <button class="btn ${u.ativo!==false?'danger':'success'} small" onclick="alternarAtivoUsuario(${u.id})">${u.ativo!==false?'Inativar':'Reativar'}</button>
-        <button class="btn danger small" onclick="removerUsuario(${u.id})">Excluir</button>
       </td>`;
     tbody.appendChild(tr);
   });
@@ -1727,23 +1678,6 @@ async function alternarAtivoUsuario(id){
   }
   u.ativo = (u.ativo===false) ? true : false;
   await dbPut('usuarios', u);
-  carregarTabelaUsuarios();
-}
-
-async function removerUsuario(id){
-  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode alterar cadastros.', 'error'); return; }
-  const usuarios = await dbGetAll('usuarios');
-  const u = usuarios.find(x=>x.id===id);
-  if(!u) return;
-  if(u.id === usuarioLogado.id){ mostrarToast('Você não pode excluir sua própria conta.', 'error'); return; }
-  if(u.perfil==='admin'){
-    const totalAdmins = usuarios.filter(x=> x.perfil==='admin').length;
-    if(totalAdmins <= 1){ mostrarToast('Não é possível excluir o único administrador do sistema.', 'error'); return; }
-  }
-  if(!confirm('Excluir definitivamente o usuário "' + u.nome + '" (' + u.login + ')?\n\nEssa ação não pode ser desfeita — se quiser apenas impedir o acesso mantendo o histórico, use "Inativar" em vez disso.')){
-    return;
-  }
-  await dbDelete('usuarios', id);
   carregarTabelaUsuarios();
 }
 
@@ -2082,7 +2016,169 @@ async function limparBaseSistema(){
   mostrarToast('Base do sistema limpa.', 'info');
 }
 
+/* =========================================================================
+   CONVERSÃO DE SKU POR CLIENTE (MAESTRO)
+   Cada cliente tem sua própria planilha "maestro" (colunas Part-Number =
+   código do cliente / Codigo = SKU do sistema). O contador seleciona o
+   cliente ativo na etapa 1 (posição) e, a partir daí, todo SKU bipado ou
+   digitado é conferido contra o mapa daquele cliente: se o valor lido bater
+   com um Part-Number cadastrado, o campo SKU é SUBSTITUÍDO pelo Codigo do
+   sistema. Se não houver correspondência, o valor lido é mantido como está
+   (assume-se que já é o SKU do sistema).
+   Guardamos em cache (mapaConversaoCache) o mapa do cliente atualmente
+   selecionado para que a conversão, usada dentro do fluxo de bipagem
+   (inclusive no callback síncrono da câmera), não dependa de uma consulta
+   assíncrona ao IndexedDB a cada leitura.
+   ========================================================================= */
+let clienteConversaoAtual = '';
+let mapaConversaoCache = null; // {cliente, mapa: {skuClienteNormalizado: {codigo, descricao}}}
+
+async function preencherSelectClienteConversao(){
+  const sel = document.getElementById('selClienteConversao');
+  if(!sel) return;
+  const clientes = await dbGetAll('maestroConversao');
+  const valorAnterior = clienteConversaoAtual;
+  sel.innerHTML = '<option value="">-- Nenhum (não converter SKU) --</option>';
+  clientes.sort((a,b)=> a.cliente.localeCompare(b.cliente)).forEach(c=>{
+    const opt = document.createElement('option');
+    opt.value = c.cliente;
+    opt.textContent = c.clienteOriginal || c.cliente;
+    sel.appendChild(opt);
+  });
+  // Restaura a seleção anterior (persistida em config) se o cliente ainda existir.
+  if(valorAnterior && clientes.some(c=> c.cliente === valorAnterior)){
+    sel.value = valorAnterior;
+    await carregarMapaConversaoParaCache(valorAnterior);
+  } else if(valorAnterior){
+    // cliente selecionado foi removido do maestro nesse meio tempo
+    clienteConversaoAtual = '';
+    mapaConversaoCache = null;
+    await dbPut('config', {chave:'clienteConversaoSelecionado', valor:''});
+  }
+}
+
+async function onMudarClienteConversao(){
+  const sel = document.getElementById('selClienteConversao');
+  clienteConversaoAtual = sel ? sel.value : '';
+  await dbPut('config', {chave:'clienteConversaoSelecionado', valor: clienteConversaoAtual});
+  if(clienteConversaoAtual){
+    await carregarMapaConversaoParaCache(clienteConversaoAtual);
+  } else {
+    mapaConversaoCache = null;
+  }
+}
+
+async function carregarMapaConversaoParaCache(cliente){
+  const registro = await dbGet('maestroConversao', cliente);
+  mapaConversaoCache = registro ? {cliente: registro.cliente, mapa: registro.mapa} : null;
+}
+
+// Aplica a conversão no campo SKU em tela, de forma síncrona (usa apenas o
+// cache em memória) — chamada tanto ao confirmar o SKU digitado (Enter)
+// quanto logo após uma leitura de câmera bem-sucedida no campo SKU.
+function aplicarConversaoSkuNoCampo(){
+  if(!mapaConversaoCache || !mapaConversaoCache.mapa) return;
+  const campo = document.getElementById('inputSku');
+  if(!campo) return;
+  const lido = campo.value.trim();
+  if(!lido) return;
+  const achado = mapaConversaoCache.mapa[normalizar(lido)];
+  if(achado && achado.codigo){
+    campo.value = achado.codigo;
+    mostrarToast('🔄 SKU convertido (' + (mapaConversaoCache.clienteOriginal || mapaConversaoCache.cliente) + '): ' + lido + ' → ' + achado.codigo, 'info');
+  }
+  // sem correspondência: mantém o valor lido como está (assume-se que já é o SKU do sistema)
+}
+
+function onEnterCampoSku(){
+  aplicarConversaoSkuNoCampo();
+  document.getElementById('inputLote').focus();
+}
+
+function prepararUploadMaestroConversao(){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode carregar bases.', 'error'); return; }
+  const nome = document.getElementById('inputNomeClienteMaestro').value.trim();
+  if(!nome){ mostrarToast('Informe o nome do cliente antes de carregar o arquivo.', 'error'); return; }
+  document.getElementById('fileMaestroConversao').click();
+}
+
+async function carregarMaestroConversao(evt){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode carregar bases.', 'error'); return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+  const nomeOriginal = document.getElementById('inputNomeClienteMaestro').value.trim();
+  if(!nomeOriginal){ mostrarToast('Informe o nome do cliente antes de carregar o arquivo.', 'error'); evt.target.value=''; return; }
+  const clienteChave = normalizar(nomeOriginal);
+  try{
+    const rows = await lerArquivoExcel(file);
+    const mapa = {};
+    let total = 0;
+    rows.forEach(r=>{
+      const partNumber = valorParaTextoBruto(acharColuna(r,'Part-Number','PartNumber','Part Number','SKU CLIENTE','SKU DO CLIENTE'));
+      const codigo = valorParaTextoBruto(acharColuna(r,'Codigo','Código','CODE'));
+      if(!partNumber || !codigo) return; // Part-Number em branco = sem conversão para essa linha
+      const chave = normalizar(partNumber);
+      mapa[chave] = {codigo: codigo.trim(), descricao: valorParaTextoBruto(acharColuna(r,'Descricao','Descrição'))};
+      total++;
+    });
+    if(total === 0){
+      mostrarToast('Nenhuma linha com Part-Number e Codigo preenchidos foi encontrada nessa planilha.', 'error');
+      evt.target.value = '';
+      return;
+    }
+    await dbPut('maestroConversao', {
+      cliente: clienteChave,
+      clienteOriginal: nomeOriginal,
+      mapa,
+      total,
+      atualizadoEm: agora()
+    });
+    mostrarToast(total + ' código(s) de conversão carregados para o cliente "' + nomeOriginal + '".', 'ok');
+    document.getElementById('inputNomeClienteMaestro').value = '';
+    await atualizarPainelMaestro();
+    await preencherSelectClienteConversao();
+    // se o cliente recém-carregado é o que já está selecionado, atualiza o cache em uso
+    if(clienteConversaoAtual === clienteChave){
+      await carregarMapaConversaoParaCache(clienteChave);
+    }
+  }catch(err){
+    mostrarToast('Erro ao ler o arquivo: ' + err.message, 'error');
+  }
+  evt.target.value = '';
+}
+
+async function removerClienteMaestro(cliente){
+  if(!ehAdmin()) return;
+  const registro = await dbGet('maestroConversao', cliente);
+  const nomeExibicao = registro ? (registro.clienteOriginal || registro.cliente) : cliente;
+  if(!confirm('Remover o maestro de conversão do cliente "' + nomeExibicao + '"?')) return;
+  await dbDelete('maestroConversao', cliente);
+  if(clienteConversaoAtual === cliente){
+    clienteConversaoAtual = '';
+    mapaConversaoCache = null;
+    await dbPut('config', {chave:'clienteConversaoSelecionado', valor:''});
+  }
+  await atualizarPainelMaestro();
+  await preencherSelectClienteConversao();
+  mostrarToast('Maestro do cliente "' + nomeExibicao + '" removido.', 'info');
+}
+
+async function atualizarPainelMaestro(){
+  const tbody = document.getElementById('tabelaMaestroConversao');
+  if(!tbody) return;
+  const clientes = await dbGetAll('maestroConversao');
+  tbody.innerHTML = '';
+  clientes.sort((a,b)=> a.cliente.localeCompare(b.cliente)).forEach(c=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${c.clienteOriginal || c.cliente}</td><td>${c.total || 0}</td><td>${formatarDataHora(c.atualizadoEm)}</td>
+      <td><button class="btn danger small" onclick="removerClienteMaestro('${c.cliente.replace(/'/g,"\\'")}')">Remover</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
 async function atualizarPainelBases(){
+  await atualizarPainelMaestro();
+  await preencherSelectClienteConversao();
   const layout = await dbGetAll('layout');
   const baseSistema = await dbGetAll('baseSistema');
   const cfgLayout = await dbGet('config', 'layoutAtualizadoEm');
