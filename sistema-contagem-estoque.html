@@ -1662,6 +1662,7 @@ async function carregarTabelaUsuarios(){
       <td>
         <button class="btn secondary small" onclick="editarUsuario(${u.id})">Editar</button>
         <button class="btn ${u.ativo!==false?'danger':'success'} small" onclick="alternarAtivoUsuario(${u.id})">${u.ativo!==false?'Inativar':'Reativar'}</button>
+        <button class="btn danger small" onclick="removerUsuario(${u.id})">Excluir</button>
       </td>`;
     tbody.appendChild(tr);
   });
@@ -1691,6 +1692,23 @@ async function alternarAtivoUsuario(id){
   }
   u.ativo = (u.ativo===false) ? true : false;
   await dbPut('usuarios', u);
+  carregarTabelaUsuarios();
+}
+
+async function removerUsuario(id){
+  if(!ehAdmin()){ mostrarToast('Apenas o administrador pode alterar cadastros.', 'error'); return; }
+  const usuarios = await dbGetAll('usuarios');
+  const u = usuarios.find(x=>x.id===id);
+  if(!u) return;
+  if(u.id === usuarioLogado.id){ mostrarToast('Você não pode excluir sua própria conta.', 'error'); return; }
+  if(u.perfil==='admin'){
+    const totalAdmins = usuarios.filter(x=> x.perfil==='admin').length;
+    if(totalAdmins <= 1){ mostrarToast('Não é possível excluir o único administrador do sistema.', 'error'); return; }
+  }
+  if(!confirm('Excluir definitivamente o usuário "' + u.nome + '" (' + u.login + ')?\n\nEssa ação não pode ser desfeita — se quiser apenas impedir o acesso mantendo o histórico, use "Inativar" em vez disso.')){
+    return;
+  }
+  await dbDelete('usuarios', id);
   carregarTabelaUsuarios();
 }
 

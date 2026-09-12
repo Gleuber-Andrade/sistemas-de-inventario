@@ -402,6 +402,14 @@ function dbPutIndexedDB(store, obj){
     req.onerror = (ev) => reject(ev.target.error);
   });
 }
+function dbDeleteIndexedDB(store, key){
+  return new Promise((resolve, reject) => {
+    const tx = dbLocal.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = (ev) => reject(ev.target.error);
+  });
+}
 
 /* ---- Banco temporário em memória (só dura enquanto a aba estiver aberta) ---- */
 function dbGetAllMemoria(store){
@@ -417,6 +425,10 @@ function dbPutMemoria(store, obj){
   const idx = memDB.usuarios.findIndex(u => u.id === obj.id);
   if(idx >= 0) memDB.usuarios[idx] = obj; else memDB.usuarios.push(obj);
   return Promise.resolve(obj.id);
+}
+function dbDeleteMemoria(store, key){
+  if(store === 'usuarios') memDB.usuarios = memDB.usuarios.filter(u => u.id !== key);
+  return Promise.resolve();
 }
 
 /* ---- Camada única usada pelo resto do código: escolhe servidor, IndexedDB ou memória ---- */
@@ -479,6 +491,16 @@ async function dbPut(store, obj){
     return salvo.id;
   }
   return usarBancoMemoria ? dbPutMemoria(store, obj) : dbPutIndexedDB(store, obj);
+}
+async function dbDelete(store, key){
+  if(store === 'usuarios' && PORTAL_API_URL){
+    const resp = await fetchComRetentativa(PORTAL_API_URL + '/usuarios/' + key, {
+      method: 'DELETE', headers: cabecalhosPortalApi()
+    });
+    if(!resp.ok) throw new Error('Erro ao excluir usuário no servidor (HTTP ' + resp.status + ').');
+    return;
+  }
+  return usarBancoMemoria ? dbDeleteMemoria(store, key) : dbDeleteIndexedDB(store, key);
 }
 
 async function sha256(texto){
@@ -648,6 +670,7 @@ async function desenharUsuarios(){
       <td><span class="pill ${u.ativo === false ? 'inativo' : 'usuario'}">${u.ativo === false ? 'Inativo' : 'Ativo'}</span></td>
       <td>
         <button class="icon-btn" title="${u.ativo === false ? 'Reativar' : 'Desativar'}" onclick="alternarUsuario(${u.id})">${u.ativo === false ? '✅' : '🚫'}</button>
+        <button class="icon-btn" title="Excluir definitivamente" onclick="removerUsuario(${u.id})">🗑️</button>
       </td>
     </tr>
   `;
@@ -814,6 +837,17 @@ async function alternarUsuario(id){
   if(u.id === usuarioLogado.id){ alert('Você não pode desativar sua própria conta.'); return; }
   u.ativo = !(u.ativo !== false);
   await dbPut('usuarios', u);
+  await desenharUsuarios();
+}
+
+async function removerUsuario(id){
+  const u = await dbGet('usuarios', id);
+  if(!u) return;
+  if(u.id === usuarioLogado.id){ alert('Você não pode excluir sua própria conta.'); return; }
+  if(!confirm('Excluir definitivamente o usuário "' + u.nome + '" (' + u.login + ')?\n\nEssa ação não pode ser desfeita — se quiser apenas impedir o acesso mantendo o histórico, use "Desativar" em vez disso.')){
+    return;
+  }
+  await dbDelete('usuarios', id);
   await desenharUsuarios();
 }
 
