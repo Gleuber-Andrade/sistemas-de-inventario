@@ -455,6 +455,41 @@ function normalizarLogin(s){
   return (s===undefined || s===null) ? '' : String(s).trim().toUpperCase();
 }
 
+// =========================================================
+// "Olho mágico" — adiciona um botão de mostrar/ocultar em todo campo de
+// senha da página automaticamente, sem precisar mexer em cada campo um
+// por um. Roda uma vez, quando a página termina de carregar.
+// =========================================================
+function adicionarOlhoMagicoSenhas(){
+  document.querySelectorAll('input[type="password"]').forEach(input => {
+    if(input.dataset.olhoMagico) return; // já tem, não duplica
+    input.dataset.olhoMagico = '1';
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:relative; display:flex; align-items:center; width:100%;';
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+    input.style.paddingRight = '38px';
+    input.style.width = '100%';
+    input.style.boxSizing = 'border-box';
+
+    const botao = document.createElement('button');
+    botao.type = 'button';
+    botao.textContent = '👁️';
+    botao.title = 'Mostrar/ocultar senha';
+    botao.style.cssText = 'position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1rem; padding:4px; line-height:1; opacity:0.65;';
+    botao.onmouseenter = () => botao.style.opacity = '1';
+    botao.onmouseleave = () => botao.style.opacity = '0.65';
+    botao.onclick = () => {
+      const mostrando = input.type === 'text';
+      input.type = mostrando ? 'password' : 'text';
+      botao.textContent = mostrando ? '👁️' : '🙈';
+    };
+    wrapper.appendChild(botao);
+  });
+}
+document.addEventListener('DOMContentLoaded', adicionarOlhoMagicoSenhas);
+
 let usuarioLogado = null; // {id, nome, login, perfil}
 
 function ehAdmin(){ return usuarioLogado && usuarioLogado.perfil === 'admin'; }

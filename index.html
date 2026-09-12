@@ -141,6 +141,7 @@ table.users tr:last-child td{border-bottom:none;}
 .pill.admin{background:#FDECEA; color:#B3261E;}
 .pill.usuario{background:#E8F6F4; color:var(--teal-dark);}
 .pill.inativo{background:#EEE; color:#888;}
+.pill.online{background:#E6F4EA; color:#1E7B34;}
 .icon-btn{background:none; border:none; cursor:pointer; font-size:1rem; padding:4px 6px; border-radius:6px;}
 .icon-btn:hover{background:var(--cloud);}
 
@@ -315,7 +316,7 @@ table.users tr:last-child td{border-bottom:none;}
         </div>
       </div>
       <table class="users">
-        <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Sistemas liberados</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Sistemas liberados</th><th>Status</th><th>Conectado</th><th></th></tr></thead>
         <tbody id="usersBody"></tbody>
       </table>
     </div>
@@ -509,6 +510,41 @@ async function sha256(texto){
 }
 function normalizar(s){ return (s||'').trim().toLowerCase(); }
 
+// =========================================================
+// "Olho mágico" — adiciona um botão de mostrar/ocultar em todo campo de
+// senha da página automaticamente, sem precisar mexer em cada campo um
+// por um. Roda uma vez, quando a página termina de carregar.
+// =========================================================
+function adicionarOlhoMagicoSenhas(){
+  document.querySelectorAll('input[type="password"]').forEach(input => {
+    if(input.dataset.olhoMagico) return; // já tem, não duplica
+    input.dataset.olhoMagico = '1';
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:relative; display:flex; align-items:center; width:100%;';
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+    input.style.paddingRight = '38px';
+    input.style.width = '100%';
+    input.style.boxSizing = 'border-box';
+
+    const botao = document.createElement('button');
+    botao.type = 'button';
+    botao.textContent = '👁️';
+    botao.title = 'Mostrar/ocultar senha';
+    botao.style.cssText = 'position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1rem; padding:4px; line-height:1; opacity:0.65;';
+    botao.onmouseenter = () => botao.style.opacity = '1';
+    botao.onmouseleave = () => botao.style.opacity = '0.65';
+    botao.onclick = () => {
+      const mostrando = input.type === 'text';
+      input.type = mostrando ? 'password' : 'text';
+      botao.textContent = mostrando ? '👁️' : '🙈';
+    };
+    wrapper.appendChild(botao);
+  });
+}
+document.addEventListener('DOMContentLoaded', adicionarOlhoMagicoSenhas);
+
 function mostrarTela(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -559,13 +595,48 @@ async function fazerLogin(){
 }
 
 async function fazerLogout(){
+  pararHeartbeat();
   usuarioLogado = null;
   await dbPut('config', {chave:'sessaoUsuarioId', valor:null});
   mostrarTela('screenLogin');
 }
 
+// =========================================================
+// "Quem está online" — manda um sinal a cada 30s pro servidor pra avisar
+// que este navegador continua com o portal aberto. Se parar de mandar
+// (fechou a aba, caiu a conexão), o servidor por conta própria some com o
+// registro depois de um tempo — não precisamos avisar explicitamente que
+// desconectou pra isso funcionar na maioria dos casos.
+// =========================================================
+let heartbeatIntervalId = null;
+function iniciarHeartbeat(){
+  if(!PORTAL_API_URL || heartbeatIntervalId || !usuarioLogado) return;
+  const enviarSinal = () => {
+    fetch(PORTAL_API_URL + '/sessoes/heartbeat', {
+      method: 'POST', headers: cabecalhosPortalApi(),
+      body: JSON.stringify({usuarioId: usuarioLogado.id, login: usuarioLogado.login, nome: usuarioLogado.nome})
+    }).catch(() => {}); // falha de rede aqui não deve incomodar o usuário
+  };
+  enviarSinal();
+  heartbeatIntervalId = setInterval(enviarSinal, 30000);
+}
+function pararHeartbeat(){
+  if(heartbeatIntervalId){ clearInterval(heartbeatIntervalId); heartbeatIntervalId = null; }
+  if(PORTAL_API_URL && usuarioLogado){
+    // Tentativa direta (sem repetição), só pra sumir da lista mais rápido
+    // no caso comum de logout normal — se falhar, o prazo no servidor
+    // resolve sozinho de qualquer forma.
+    fetch(PORTAL_API_URL + '/sessoes/logout', {
+      method: 'POST', headers: cabecalhosPortalApi(), body: JSON.stringify({usuarioId: usuarioLogado.id})
+    }).catch(() => {});
+  }
+}
+window.addEventListener('beforeunload', pararHeartbeat);
+
 /* ---------------- Dashboard ---------------- */
+let atualizacaoOnlineIntervalId = null;
 async function abrirDashboard(){
+  iniciarHeartbeat();
   document.getElementById('whoName').textContent = usuarioLogado.nome;
   const tagEl = document.getElementById('whoTag');
   tagEl.textContent = usuarioLogado.perfil === 'admin' ? 'Administrador' : 'Usuário comum';
@@ -575,6 +646,16 @@ async function abrirDashboard(){
   if(usuarioLogado.perfil === 'admin'){
     desenharChecksPermissaoNovoUsuario();
     await desenharUsuarios();
+    // Atualiza "quem está online" periodicamente enquanto o admin estiver
+    // olhando o painel — não precisa recarregar a página pra ver alguém
+    // entrando ou saindo.
+    if(!atualizacaoOnlineIntervalId){
+      atualizacaoOnlineIntervalId = setInterval(() => {
+        if(document.querySelector('.screen.active')?.id === 'screenDash' && usuarioLogado?.perfil === 'admin'){
+          desenharUsuarios();
+        }
+      }, 15000);
+    }
   }
   mostrarTela('screenDash');
 }
@@ -632,6 +713,20 @@ function atualizarVisibilidadePermissoesNovo(){
 
 async function desenharUsuarios(){
   const usuarios = await dbGetAll('usuarios');
+
+  // Busca quem está online agora (só funciona com o backend configurado;
+  // se falhar ou não tiver servidor, simplesmente não mostra ninguém como
+  // conectado, sem travar o resto da tela por causa disso).
+  let online = [];
+  if(PORTAL_API_URL){
+    try{
+      const resp = await fetchComRetentativa(PORTAL_API_URL + '/sessoes/online', {headers: cabecalhosPortalApi()}, 1);
+      if(resp.ok) online = await resp.json();
+    }catch(e){ /* silencioso */ }
+  }
+  const onlinePorId = {};
+  online.forEach(o => { onlinePorId[o.usuarioId] = o; });
+
   const tbody = document.getElementById('usersBody');
   tbody.innerHTML = usuarios.map(u => {
     const permitidos = u.sistemasPermitidos || [];
@@ -661,10 +756,16 @@ async function desenharUsuarios(){
         <div class="perm-editor" id="permEditor-${u.id}">${editorLinhas}</div>
       `;
 
+    const sessao = onlinePorId[u.id];
+    const colunaConectado = sessao
+      ? `<span class="pill online" title="Conectado desde ${new Date(sessao.iniciadoEm).toLocaleString('pt-BR')}">🟢 Online — desde ${new Date(sessao.iniciadoEm).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>`
+      : '<span class="chips-lista">—</span>';
+
     return `
     <tr>
       <td>${u.nome}</td>
       <td>${u.login}</td>
+      <td>${colunaConectado}</td>
       <td><span class="pill ${u.perfil}">${u.perfil === 'admin' ? 'Administrador' : 'Usuário comum'}</span></td>
       <td>${colunaPermissoes}</td>
       <td><span class="pill ${u.ativo === false ? 'inativo' : 'usuario'}">${u.ativo === false ? 'Inativo' : 'Ativo'}</span></td>
